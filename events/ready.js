@@ -11,7 +11,7 @@ module.exports = {
 		client.user.setStatus('online');
 		client.user.setActivity({
 			name: "Grinding TSA?",
-			type: ActivityType.Watching
+			type: ActivityType.Custom
 		});
 		console.log(chalk.red(`Logged in as ${client.user.tag}!`))
 	}

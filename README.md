@@ -1,0 +1,1 @@
+Command handler modified from [Nathaniel-VFX's Discord.js v14 Command Handlers](https://github.com/Nathaniel-VFX/Discord.js-v14-Command-Handlers)
