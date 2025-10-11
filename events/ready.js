@@ -1,7 +1,7 @@
 const {
 	ActivityType
 } = require('discord.js');
-const client = require("..");
+const { client } = require("../index.js");
 const chalk = require('chalk');
 
 module.exports = {

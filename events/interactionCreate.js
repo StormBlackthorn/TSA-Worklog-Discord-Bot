@@ -4,11 +4,12 @@ const {
 	PermissionsBitField,
 	Interaction
 } = require('discord.js');
-const client = require("..");
+const { client } = require("../index.js");
 
 /** 
  * @param {Interaction} interaction
  */
+
 
 module.exports = {
 	event: 'interactionCreate',

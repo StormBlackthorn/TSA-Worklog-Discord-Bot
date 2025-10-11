@@ -1,7 +1,7 @@
 const fs = require('fs');
 const chalk = require('chalk');
 
-const { PermissionsBitField } = require('discord.js');
+const { PermissionsBitField, ApplicationIntegrationType, InteractionContextType } = require('discord.js');
 const { Routes } = require('discord-api-types/v9');
 const { REST } = require('@discordjs/rest')
 
@@ -11,7 +11,7 @@ const table = new AsciiTable().setHeading('Slash Commands', 'Stats').setBorder('
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-const rest = new REST({ version: '9' }).setToken(TOKEN);
+const rest = new REST().setToken(TOKEN);
 
 module.exports = (client) => {
 	const slashCommands = []; 
@@ -27,7 +27,9 @@ module.exports = (client) => {
 					type: slashCommand.type,
 					options: slashCommand.options ? slashCommand.options : null,
 					default_permission: slashCommand.default_permission ? slashCommand.default_permission : null,
-					default_member_permissions: slashCommand.default_member_permissions ? PermissionsBitField.resolve(slashCommand.default_member_permissions).toString() : null
+					default_member_permissions: slashCommand.default_member_permissions ? PermissionsBitField.resolve(slashCommand.default_member_permissions).toString() : null,
+					integration_types: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall],
+					contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
 				});
 			
 				if(slashCommand.name) {
@@ -39,6 +41,7 @@ module.exports = (client) => {
 		}
 		
 	});
+	
 	console.log(chalk.red(table.toString()));
 
 	(async () => {

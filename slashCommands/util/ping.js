@@ -1,5 +1,6 @@
 const {
-	ApplicationCommandType
+	ApplicationCommandType,
+	InteractionContextType,
 } = require('discord.js');
 
 module.exports = {
