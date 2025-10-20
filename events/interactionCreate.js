@@ -1,5 +1,4 @@
 const {
-	Collection,
 	EmbedBuilder,
 	PermissionsBitField,
 	Interaction

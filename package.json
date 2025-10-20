@@ -2,11 +2,11 @@
   "dependencies": {
     "ascii-table": "^0.0.9",
     "chalk": "^4.1.2",
-    "discord.js": "^14.22.1",
+    "discord.js": "^14.23.2",
     "dotenv": "^17.2.3",
     "fs": "^0.0.1-security",
     "glob": "^11.0.3",
     "googleapis": "^162.0.0",
-    "util": "^0.12.5"
+    "mongoose": "^8.19.1"
   }
 }
