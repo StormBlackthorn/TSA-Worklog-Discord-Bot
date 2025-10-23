@@ -14,12 +14,9 @@ module.exports = {
 	event: 'interactionCreate',
 	async run(interaction) {
 		const slashCommand = client.slashCommands.get(interaction.commandName);
-		if (interaction.type === 4) {
-			if (slashCommand.autocomplete) {
-				const choices = [];
-				await slashCommand.autocomplete(interaction, choices)
-			}
-		}
+
+		if (interaction.isAutocomplete()) return slashCommand.autoComplete(interaction);
+
 		if (!interaction.type === 2) return;
 
 		if (!slashCommand) return client.slashCommands.delete(interaction.commandName);

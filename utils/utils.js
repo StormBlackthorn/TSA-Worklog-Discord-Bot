@@ -34,7 +34,7 @@ module.exports = {
         
     },
 
-    getEventsByName(name) {
+    getEventsFromMember(name) {
         const returned = [];
         const events = require("./config/events.json");
 
@@ -51,8 +51,30 @@ module.exports = {
 
     },
 
-    getEventMembers(eventName) {
+    getEventMembersFromEvent(eventName) {
         return require("./config/events.json")[eventName];
+    },
+
+    getEventData() {
+        return require("./config/events.json");
+    },
+
+    getAllEvents() {
+        return Object.keys(require("./config/events.json"));
+    },
+
+    getAllMembers() {
+        const events = require("./config/events.json");
+        const namesSet = new Set();
+
+        for (const event in events) {
+            for (const group of events[event]) {
+                for (const name of group) {
+                    namesSet.add(name);
+                }
+            }
+        }
+        return Array.from(namesSet);
     }
 
 };
