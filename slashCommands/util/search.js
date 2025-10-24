@@ -1,11 +1,12 @@
-const { getEventsFromMember, allMembers, allEvents } = require("../../utils/utils.js");
+const { getEventsFromMember, allMembers, allEvents, getEventMembersFromEvent } = require("../../utils/utils.js");
 const {
     ApplicationCommandType,
     ApplicationCommandOptionType,
     EmbedBuilder,
     MessageFlags,
     ContainerBuilder,
-    ButtonStyle
+    ButtonStyle,
+    SeparatorSpacingSize
 } = require("discord.js");
 
 module.exports = {
@@ -24,11 +25,11 @@ module.exports = {
             autocomplete: true
         }]
     }, {
-        options: "event",
+        name: "event",
         description: "Show all competitors for an event",
         type: ApplicationCommandOptionType.Subcommand,
         options: [{
-            name: "eventName",
+            name: "event_name",
             description: "The event name you want to search for",
             type: ApplicationCommandOptionType.String,
             required: true,
@@ -47,7 +48,7 @@ module.exports = {
                     .map(choice => ({ name: choice, value: choice }))
                 );
                 break;
-            case "event":
+            case "event_name":
                 await interaction.respond(
                     allEvents.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
                     .slice(0, 7)
@@ -61,11 +62,12 @@ module.exports = {
 
     async run(client, interaction) {
         switch(interaction.options.getSubcommand()) {
-            case "user":
-                const name    = name,
+            case "user": {
+                const name    = interaction.options.getString("name"),
                       results = getEventsFromMember(name);
 
-                if(results === -1) return await interaction.reply({
+                //invalid name entered
+                if(!results) return await interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setTitle("Invalid member")
@@ -77,31 +79,28 @@ module.exports = {
 
                 const container = new ContainerBuilder()
                     .setAccentColor(0x0099ff)
+                    .addTextDisplayComponents(t => t.setContent(`## Events for *${name}*:`))
+                    .addSeparatorComponents(s => s);
                 
-                if(results.length > 0) {
-                    results.forEach(event => {
+                results.forEach(event => {
 
-                        const teammates = getEventMembersFromEvent(event)
-                            .find(group => group.includes(name))
-                            ?.filter(name => name !== name)
-                            .join(", ") || "Solo";
+                    const teammates = getEventMembersFromEvent(event)
+                        ?.find(group => group.includes(name))
+                        ?.filter(teammate => teammate !== name)
+                        .join(", ") || "Solo";
 
-                        container.addSectionComponents(section => section
-                            .addTextDisplayComponents(
-                                t => t.setContent(`**${event}**`),
-                                t => t.setContent(`> **Teammates:** *${teammates}*`)
-                            )
-                            .setButtonAccessory((button) => button.setLabel("View Event Rubric").setStyle(ButtonStyle.Link).setURL()),
-                        );
+                    container.addSectionComponents(section => section
+                        .addTextDisplayComponents(
+                            t => t.setContent(`### **${event}**`),
+                            t => t.setContent(`> **Teammates:** *${teammates}*`)
+                        )
+                        .setButtonAccessory((button) => button.setLabel("Event Rubric").setStyle(ButtonStyle.Link).setURL("https://www.youtube.com/watch?v=dQw4w9WgXcQ")),
+                    );
 
-                        container.addSeparatorComponents(s => s)
+                    container.addSeparatorComponents(s => s.setDivider(false))
 
-                    });
-                } else {
-                    container.addTextDisplayComponents(t => {
-                        t.setContent(`**${name}** is not registered for any events.`)
-                    })
-                }
+                });
+                
 
                 return await interaction.reply({
                     components: [container],
@@ -109,9 +108,10 @@ module.exports = {
                 });
 
                 break;
+            }
 
-            case "event":
-                const eventName = interaction.options.getString("eventName");
+            case "event": {
+                const eventName = interaction.options.getString("event_name");
 
                 if(!allEvents.includes(eventName)) return await interaction.reply({
                     embeds: [
@@ -123,23 +123,33 @@ module.exports = {
                     ephemeral: true
                 });
 
-                const embed = new EmbedBuilder()
-                    .setColor("Aqua");
-
-                let description = "";
                 const teams = getEventMembersFromEvent(eventName);
-                
-                teams.forEach((group, index) => description += `**Team ${index + 1}: ** *${group.join(", ")}*\n`);
 
-                embed.setDescription(description)
-                     .setTitle(`Competitors for **${eventName}** *(${teams.length} teams)*`);
+                const container = new ContainerBuilder()
+                    .setAccentColor(0x06ec98)
+                    .addSectionComponents(section => section
+                        .addTextDisplayComponents(t => t.setContent(`## Competitors for __${eventName}__ *(${teams.length} teams)*:`))
+                        .setButtonAccessory((button) => button.setLabel("Event Rubric").setStyle(ButtonStyle.Link).setURL("https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+                    )
+                    .addSeparatorComponents(s => s);
+
+                // Add each team as "{index}. > {name, name, name}"
+                teams.forEach((group, index) => {
+                    container.addTextDisplayComponents(t =>
+                        t.setContent(`**${index + 1}.** *${group.join(", ")}*`)
+                    );
+                    // small spacing between teams
+                    container.addSeparatorComponents(s => s.setDivider(false));
+                });
 
                 return await interaction.reply({
-                    embeds: [embed]
-                })
-
+                    components: [container],
+                    flags: MessageFlags.IsComponentsV2,
+                });
 
                 break;
+            }
         }
     }
 }
+

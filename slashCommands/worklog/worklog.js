@@ -32,7 +32,7 @@ module.exports = {
             type: ApplicationCommandOptionType.String,
             required: false,
         }, {
-            name: "dateRange",
+            name: "date_range",
             description: "View entries within a date range (format: DD/MM/YYYY - DD/MM/YYYY). Pulls up a date range picker.",
             type: ApplicationCommandOptionType.Boolean,
             required: false,
@@ -42,13 +42,13 @@ module.exports = {
             type: ApplicationCommandOptionType.Integer,
             required: false,
         }, {
-            name: "entryRange",
+            name: "entry_range",
             description: "View entries within the specified entry numbers. Pulls up a range picker.",
             type: ApplicationCommandOptionType.Boolean,
             required: false,
         }, {
             //TODO: make min/max bound
-            name: "lastN",
+            name: "last_nth",
             description: "View your last N entries",
             type: ApplicationCommandOptionType.Integer,
             required: false,

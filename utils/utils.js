@@ -33,7 +33,7 @@ module.exports = {
 
             if (!events[eventName]) events[eventName] = [];
 
-            if(!this.allEvents.includes(eventName)) this.allEvents.push(eventName);
+            if(!module.exports.allEvents.includes(eventName)) module.exports.allEvents.push(eventName);
             const members = cols.slice(7).map(e => e.replaceAll("\r", "")).filter(Boolean);
 
             members.forEach(name => namesSet.add(name));
@@ -42,18 +42,18 @@ module.exports = {
         }
 
         fs.writeFileSync("./utils/config/events.json", JSON.stringify(events));
-        this.allMembers = Array.from(namesSet);
+        module.exports.allMembers.push(...Array.from(namesSet));
+
         
     },
 
     /**
      * Returns a list of events that a member is participating in
      * @param { String } name  The name of the member
-     * @returns { Array<String> | Number } List of event names or -1 if member does not exist
+     * @returns { Array<String> | Boolean } List of event names or false if member does not exist
      */
     getEventsFromMember(name) {
-
-        if(!this.memberExist(name)) return [-1];
+        if(!module.exports.memberExist(name)) return false;
 
         const returned = [];
         const events = require("./config/events.json");
@@ -77,7 +77,7 @@ module.exports = {
      * @returns {Boolean} Whether the member exists
      */
     memberExist(name) {
-        return this.allMembers.includes(name);
+        return module.exports.allMembers.includes(name);
     },
 
     /**
@@ -94,7 +94,7 @@ module.exports = {
      * @returns {Array<Array<String>>} List of member names
      */
     getEventMembersFromEvent(eventName) {
-        return this.getEventsData()[eventName] || [];
+        return module.exports.getEventsData()[eventName] || [];
     },
 
 
