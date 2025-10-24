@@ -3,7 +3,7 @@ const { glob } = require('glob');
 const { google } = require('googleapis');
 const readline = require("node:readline");
 const mongoose = require("mongoose");
-const { fetchEventData } = require("./utils/utils.js");
+const { fetchEventsData } = require("./utils/utils.js");
 
 require('dotenv').config({debug: false});
 
@@ -88,7 +88,7 @@ const googleClient = {};
 
 })();
 
-fetchEventData();
+fetchEventsData();
 
 const webHook = new WebhookClient({ url: process.env.WEBHOOK_URL });
 

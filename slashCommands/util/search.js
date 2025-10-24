@@ -1,10 +1,12 @@
-const { getEventsFromMember, getAllMembers } = require("../../utils/utils.js");
+const { getEventsFromMember, allMembers, allEvents } = require("../../utils/utils.js");
 const {
     ApplicationCommandType,
-    ApplicationCommandOptionType
+    ApplicationCommandOptionType,
+    EmbedBuilder,
+    MessageFlags,
+    ContainerBuilder,
+    ButtonStyle
 } = require("discord.js");
-
-const {} = require("../../utils/utils.js");
 
 module.exports = {
     name: "search",
@@ -21,6 +23,17 @@ module.exports = {
             required: true,
             autocomplete: true
         }]
+    }, {
+        options: "event",
+        description: "Show all competitors for an event",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [{
+            name: "eventName",
+            description: "The event name you want to search for",
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            autocomplete: true
+        }]
     }],
     async autoComplete(interaction) {
 
@@ -29,7 +42,14 @@ module.exports = {
         switch(focusedOption.name) {
             case "name":
                 await interaction.respond(
-                    getAllMembers().filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    allMembers.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    .slice(0, 7)
+                    .map(choice => ({ name: choice, value: choice }))
+                );
+                break;
+            case "event":
+                await interaction.respond(
+                    allEvents.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
                     .slice(0, 7)
                     .map(choice => ({ name: choice, value: choice }))
                 );
@@ -42,8 +62,83 @@ module.exports = {
     async run(client, interaction) {
         switch(interaction.options.getSubcommand()) {
             case "user":
-                const results = getEventsFromMember(interaction.options.getString("name"));
-                await interaction.reply(results.length === 0 ? "Invalid member" : results.toString());
+                const name    = name,
+                      results = getEventsFromMember(name);
+
+                if(results === -1) return await interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle("Invalid member")
+                            .setDescription(`**${name}** is not a member of North Creek TSA.`)
+                            .setColor("Red")
+                    ],
+                    ephemeral: true
+                });
+
+                const container = new ContainerBuilder()
+                    .setAccentColor(0x0099ff)
+                
+                if(results.length > 0) {
+                    results.forEach(event => {
+
+                        const teammates = getEventMembersFromEvent(event)
+                            .find(group => group.includes(name))
+                            ?.filter(name => name !== name)
+                            .join(", ") || "Solo";
+
+                        container.addSectionComponents(section => section
+                            .addTextDisplayComponents(
+                                t => t.setContent(`**${event}**`),
+                                t => t.setContent(`> **Teammates:** *${teammates}*`)
+                            )
+                            .setButtonAccessory((button) => button.setLabel("View Event Rubric").setStyle(ButtonStyle.Link).setURL()),
+                        );
+
+                        container.addSeparatorComponents(s => s)
+
+                    });
+                } else {
+                    container.addTextDisplayComponents(t => {
+                        t.setContent(`**${name}** is not registered for any events.`)
+                    })
+                }
+
+                return await interaction.reply({
+                    components: [container],
+                    flags: MessageFlags.IsComponentsV2,
+                });
+
+                break;
+
+            case "event":
+                const eventName = interaction.options.getString("eventName");
+
+                if(!allEvents.includes(eventName)) return await interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle("Invalid event")
+                            .setDescription(`**${eventName}** is not a valid event.`)
+                            .setColor("Red")
+                    ],
+                    ephemeral: true
+                });
+
+                const embed = new EmbedBuilder()
+                    .setColor("Aqua");
+
+                let description = "";
+                const teams = getEventMembersFromEvent(eventName);
+                
+                teams.forEach((group, index) => description += `**Team ${index + 1}: ** *${group.join(", ")}*\n`);
+
+                embed.setDescription(description)
+                     .setTitle(`Competitors for **${eventName}** *(${teams.length} teams)*`);
+
+                return await interaction.reply({
+                    embeds: [embed]
+                })
+
+
                 break;
         }
     }

@@ -4,10 +4,7 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder,
     LabelBuilder,
-    TextDisplayBuilder,
 } = require("discord.js");
 const { googleClient } = require("../../index.js");
 
@@ -25,8 +22,56 @@ module.exports = {
         name: "init",
         description: "Initialize your worklog",
         type: ApplicationCommandOptionType.Subcommand,
+    }, {
+        name: "view",
+        description: "View your worklog",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [{
+            name: "date",
+            description: "The date of the entry you want to view (DD/MM/YYYY)",
+            type: ApplicationCommandOptionType.String,
+            required: false,
+        }, {
+            name: "dateRange",
+            description: "View entries within a date range (format: DD/MM/YYYY - DD/MM/YYYY). Pulls up a date range picker.",
+            type: ApplicationCommandOptionType.Boolean,
+            required: false,
+        }, {
+            name: "entry",
+            description: "The specific entry number you want to view",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+        }, {
+            name: "entryRange",
+            description: "View entries within the specified entry numbers. Pulls up a range picker.",
+            type: ApplicationCommandOptionType.Boolean,
+            required: false,
+        }, {
+            //TODO: make min/max bound
+            name: "lastN",
+            description: "View your last N entries",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+        }]
+    }, {
+        name: "export",
+        description: "Export your worklog as a PDF",
+        type: ApplicationCommandOptionType.Subcommand,
+    }, {
+        name: "worklogs",
+        description: "View all your worklogs",
+        type: ApplicationCommandOptionType.SubcommandGroup,
+        options: [{
+            name: "list",
+            description: "List all your worklogs",
+            type: ApplicationCommandOptionType.Subcommand,
+        }, {
+            name: "switch",
+            description: "Switch to a different worklog",
+            type: ApplicationCommandOptionType.Subcommand,
+            autocomplete: true
+        }],
     }],
-
     async run(client, interaction) {
 
         // await interaction.deferReply();
@@ -34,6 +79,7 @@ module.exports = {
         switch(interaction.options.getSubcommand()) {
             case "init":
 
+                //TODO: try to find email from name via TSA website
                 await interaction.showModal(
                     new ModalBuilder()
                         .setCustomId('worklogInit')
@@ -50,7 +96,7 @@ module.exports = {
                                         .setRequired(true)
                                 ),
                         )
-                )
+                );
 
                 interaction.awaitModalSubmit({
                     time: 150_000
@@ -107,6 +153,33 @@ module.exports = {
                 //         }],
                 //     },
                 // });
+
+                break;
+
+            case "add":
+                await interaction.reply("Worklog add command is under development.");
+
+                break;
+
+            case "view":
+                await interaction.reply("Worklog view command is under development.");  
+
+                break;
+
+            case "export":
+                await interaction.reply("Worklog export command is under development.");
+
+                break;
+            
+            case "worklogs":
+                switch(interaction.options.getSubcommand()) {
+                    case "list":
+                        await interaction.reply("Worklog list command is under development.");
+                        break;
+                    case "switch":
+                        await interaction.reply("Worklog switch command is under development.");
+                        break;
+                }
 
                 break;
         }

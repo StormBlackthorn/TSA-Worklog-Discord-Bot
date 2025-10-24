@@ -2,12 +2,24 @@ const { googleClient, database } = require("../index.js");
 const fs = require("fs");
 
 module.exports = {
-    async fetchEventData() {
+    /**
+     * List of all the events that has competitors. Events with no sign ups will not show up.
+     */
+    allEvents: [],
+    /**
+     * List of all the members that have signed up for events. No duplicates.
+     */
+    allMembers: [],
+    /**
+     * Fetch events data from the Google Sheets and store it locally
+     */
+    async fetchEventsData() {
 
         const lines = (await (await fetch("https://docs.google.com/spreadsheets/d/1TVDFLZBMgkTF0BKPGhmLP_FbUePj-CfKaJu9Avp7bPw/export?format=csv&gid=0"))
             .text()).split("\n").slice(2);
 
         const events = {};
+        const namesSet = new Set();
 
         for (const line of lines) {
 
@@ -21,20 +33,28 @@ module.exports = {
 
             if (!events[eventName]) events[eventName] = [];
 
+            if(!this.allEvents.includes(eventName)) this.allEvents.push(eventName);
+            const members = cols.slice(7).map(e => e.replaceAll("\r", "")).filter(Boolean);
+
+            members.forEach(name => namesSet.add(name));
             //add members
-            events[eventName].push(
-                cols.slice(7)
-                    .map(e => e.replace("\r", ""))
-                    .filter(Boolean)
-            );
+            events[eventName].push(members);
         }
 
         fs.writeFileSync("./utils/config/events.json", JSON.stringify(events));
-
+        this.allMembers = Array.from(namesSet);
         
     },
 
+    /**
+     * Returns a list of events that a member is participating in
+     * @param { String } name  The name of the member
+     * @returns { Array<String> | Number } List of event names or -1 if member does not exist
+     */
     getEventsFromMember(name) {
+
+        if(!this.memberExist(name)) return [-1];
+
         const returned = [];
         const events = require("./config/events.json");
 
@@ -51,31 +71,33 @@ module.exports = {
 
     },
 
-    getEventMembersFromEvent(eventName) {
-        return require("./config/events.json")[eventName];
+    /**
+     * Checks if a member exists and has signed up for events. Members who registered but did not sign up for events is considered to not exist.
+     * @param {String} name  The name of the member
+     * @returns {Boolean} Whether the member exists
+     */
+    memberExist(name) {
+        return this.allMembers.includes(name);
     },
 
-    getEventData() {
+    /**
+     * Get all events data from the local JSON file
+     * @returns { Object } Events data
+     */
+    getEventsData() {
         return require("./config/events.json");
     },
 
-    getAllEvents() {
-        return Object.keys(require("./config/events.json"));
+    /**
+     * Get all groups for a specific event
+     * @param {String} eventName
+     * @returns {Array<Array<String>>} List of member names
+     */
+    getEventMembersFromEvent(eventName) {
+        return this.getEventsData()[eventName] || [];
     },
 
-    getAllMembers() {
-        const events = require("./config/events.json");
-        const namesSet = new Set();
 
-        for (const event in events) {
-            for (const group of events[event]) {
-                for (const name of group) {
-                    namesSet.add(name);
-                }
-            }
-        }
-        return Array.from(namesSet);
-    }
 
 };
 
