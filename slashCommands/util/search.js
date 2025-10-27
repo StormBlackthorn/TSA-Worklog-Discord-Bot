@@ -1,4 +1,4 @@
-const { getEventsFromMember, allMembers, allEvents, getEventMembersFromEvent } = require("../../utils/utils.js");
+const { Events } = require("../../utils/utils.js");
 const {
     ApplicationCommandType,
     ApplicationCommandOptionType,
@@ -6,7 +6,6 @@ const {
     MessageFlags,
     ContainerBuilder,
     ButtonStyle,
-    SeparatorSpacingSize
 } = require("discord.js");
 
 module.exports = {
@@ -43,14 +42,14 @@ module.exports = {
         switch(focusedOption.name) {
             case "name":
                 await interaction.respond(
-                    allMembers.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    Events.allMembers.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
                     .slice(0, 7)
                     .map(choice => ({ name: choice, value: choice }))
                 );
                 break;
             case "event_name":
                 await interaction.respond(
-                    allEvents.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    Events.allEvents.filter(choice => choice.toLowerCase().includes(focusedOption.value.toLowerCase()))
                     .slice(0, 7)
                     .map(choice => ({ name: choice, value: choice }))
                 );
@@ -64,7 +63,7 @@ module.exports = {
         switch(interaction.options.getSubcommand()) {
             case "user": {
                 const name    = interaction.options.getString("name"),
-                      results = getEventsFromMember(name);
+                      results = Events.getEventsFromMember(name);
 
                 //invalid name entered
                 if(!results) return await interaction.reply({
@@ -84,7 +83,7 @@ module.exports = {
                 
                 results.forEach(event => {
 
-                    const teammates = getEventMembersFromEvent(event)
+                    const teammates = Events.getEventMembersFromEvent(event)
                         ?.find(group => group.includes(name))
                         ?.filter(teammate => teammate !== name)
                         .join(", ") || "Solo";
@@ -113,17 +112,17 @@ module.exports = {
             case "event": {
                 const eventName = interaction.options.getString("event_name");
 
-                if(!allEvents.includes(eventName)) return await interaction.reply({
+                if(!Events.allEvents.includes(eventName)) return await interaction.reply({
                     embeds: [
                         new EmbedBuilder()
                             .setTitle("Invalid event")
                             .setDescription(`**${eventName}** is not a valid event.`)
-                            .setColor("Red")
+                            .setColor("Red")>b
                     ],
                     ephemeral: true
                 });
 
-                const teams = getEventMembersFromEvent(eventName);
+                const teams = Events.getEventMembersFromEvent(eventName);
 
                 const container = new ContainerBuilder()
                     .setAccentColor(0x06ec98)
@@ -133,12 +132,10 @@ module.exports = {
                     )
                     .addSeparatorComponents(s => s);
 
-                // Add each team as "{index}. > {name, name, name}"
                 teams.forEach((group, index) => {
                     container.addTextDisplayComponents(t =>
                         t.setContent(`**${index + 1}.** *${group.join(", ")}*`)
                     );
-                    // small spacing between teams
                     container.addSeparatorComponents(s => s.setDivider(false));
                 });
 

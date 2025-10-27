@@ -3,8 +3,7 @@ const { glob } = require('glob');
 const { google } = require('googleapis');
 const readline = require("node:readline");
 const mongoose = require("mongoose");
-const { fetchEventsData } = require("./utils/utils.js");
-
+const { Events, errorMessage } = require("./utils/utils.js")
 require('dotenv').config({debug: false});
 
 const client = new Client({ //TODO: figure out exactly which intents and partials are needed
@@ -88,38 +87,23 @@ const googleClient = {};
 
 })();
 
-fetchEventsData();
+Events.fetchEventsData();
 
-const webHook = new WebhookClient({ url: process.env.WEBHOOK_URL });
 
 process.on('uncaughtException', (err, origin) => {
-			webHook.send({
-			content: `<@1409557350729257090>`,
-			embeds: [
-				new EmbedBuilder()
-					.setTitle('UncaughtException Error')
-					.setColor('Red')
-					.setDescription(`***${err} [ \`${origin}\` ]***\n\n\`\`\`sh\n${err.stack.length > 2000 ? err.stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : err.stack}\`\`\` `)
-					.setTimestamp()
-			]
-		})
-
-		console.warn(`----------ERROR----------\n${err} [ ${origin} ]\n\n${err.stack}\n-------------------------`)
-})
+	errorMessage({
+		stack: err.stack, 
+		content: `${err} [ ${origin} ]`, 
+		title: "UncaughtException Error"
+	})		
+});
 
 process.on('unhandledRejection', (reason, promise) => {
-	webHook.send({
-		content: `<@1409557350729257090>`,
-		embeds: [
-			new EmbedBuilder()
-				.setTitle('UnhandledRejection Error')
-				.setColor('Red')
-				.setDescription(`***${reason}***\n\n\`\`\`sh\n${reason.stack.length > 2000 ? reason.stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : reason.stack}\`\`\` `)
-				.setTimestamp()
-		]
+	errorMessage({
+		stack: reason.stack,
+		content: reason,
+		title: "UnhandledRejection Error"
 	})
-
-	console.warn(`----------ERROR----------\nUnhandledRejection: ${reason}\n\n${reason.stack}\n-------------------------`)
 }); 
 
 process.once("exit", code => console.log(`Process exited with code: ${code}`));

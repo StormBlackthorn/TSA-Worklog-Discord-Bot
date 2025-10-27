@@ -8,6 +8,8 @@ const {
 } = require("discord.js");
 const { googleClient } = require("../../index.js");
 
+const { Database } = require("../../utils/utils.js");
+
 const folderID = "1Kj7zdg_ccnVvT9F7epl5bYN1kK8GMy47";
 
 module.exports = {
@@ -72,116 +74,145 @@ module.exports = {
             autocomplete: true
         }],
     }],
+    async autoComplete(interaction) {
+        const focusedOption = interaction.options.getFocused(true);
+
+        //await IS required(I think), ignore warning
+        const user = await Database.userExist(interaction.user.id);
+
+        if(!user) return await interaction.respond({
+            name: "Please initialize your user profile first using /user init",
+            value: null
+        })
+
+        switch(focusedOption.name) {
+            case "switch":
+
+                await interaction.respond(
+                    user.worklogs
+                    .filter(worklog => worklog.name.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    .map(worklog => ({ name: worklog.name, value: worklog._id.toString() }))
+                );
+                break;
+        }
+    },
     async run(client, interaction) {
 
         // await interaction.deferReply();
+        const subcommandGroup = interaction.options.getSubcommandGroup(),
+              subcommand = interaction.options.getSubcommand();
 
-        switch(interaction.options.getSubcommand()) {
-            case "init":
-
-                //TODO: try to find email from name via TSA website
-                await interaction.showModal(
-                    new ModalBuilder()
-                        .setCustomId('worklogInit')
-                        .setTitle('Initialize Your Worklog')
-                        .addLabelComponents(
-                            new LabelBuilder()
-                                .setLabel("Project Name")
-                                .setDescription("The name of your project")
-                                .setTextInputComponent(
-                                    new TextInputBuilder()
-                                        .setCustomId("projectName")
-                                        .setStyle(TextInputStyle.Short)
-                                        .setPlaceholder("Your project name: ")
-                                        .setRequired(true)
-                                ),
-                        )
-                );
-
-                interaction.awaitModalSubmit({
-                    time: 150_000
-                }).then(async interaction => {
-
-                    interaction.deferReply();
-
-                    const projectName = interaction.fields.getTextInputValue("projectName"),
-                          ownerName   = "",
-                          ownerEmail  = "";
-               
-                    const document = await googleClient.drive.files.create({
-                        resource: {
-                            name: `${projectName} - TSA Worklog`,
-                            mimeType: "application/vnd.google-apps.document",
-                            parents: [folderID]
-                        },
-                    }).catch(err => {
-                        console.error("Error creating document:", err);
-                        interaction.followUp("There was an error creating your worklog document. Please shoot @Chthollygirl a dm");
-                    });
-
-                    await googleClient.drive.permissions.create({
-                        fileId: document.data.id,
-                        requestBody: {
-                            type: "user",
-                            role: "writer", // or 'reader' if you just want view access
-                            emailAddress: ownerEmail,
-                        },
-                    }).catch(err => {
-                        console.error("Error sharing document:", err);
-                        interaction.followUp("There was an error creating your worklog document. Please shoot @Chthollygirl a dm");
-                        //TODO check if email is correct
-                    });;
-
-                    interaction.followUp(`Created Document: [${document.data.name}](https://docs.google.com/document/d/${document.data.id}/edit)`);
-
-                })
-                .catch(e => {
-                    interaction.followUp("You did not submit the modal in time! Please try again.") 
-                    console.log(e)
-                });
-
-
-
-                // await googleClient.docs.documents.batchUpdate({
-                //     documentId: document.data.id,
-                //     requestBody: {
-                //         requests: [{
-                //             insertText: {
-                //                 location: { index: 1 },
-                //                 text: "Test input from worklog bot",
-                //             },
-                //         }],
-                //     },
-                // });
-
-                break;
-
-            case "add":
-                await interaction.reply("Worklog add command is under development.");
-
-                break;
-
-            case "view":
-                await interaction.reply("Worklog view command is under development.");  
-
-                break;
-
-            case "export":
-                await interaction.reply("Worklog export command is under development.");
-
-                break;
-            
+        switch(subcommandGroup) {
+        
             case "worklogs":
-                switch(interaction.options.getSubcommand()) {
+                switch(subcommand) {
                     case "list":
-                        await interaction.reply("Worklog list command is under development.");
+                        return await interaction.reply("Worklog list command is under development.");
                         break;
                     case "switch":
-                        await interaction.reply("Worklog switch command is under development.");
+                        return await interaction.reply("Worklog switch command is under development.");
+                        break;
+                }
+            
+            //no subcommand group
+            case null:
+                switch(subcommand) {
+                    case "init":
+
+                        //TODO: try to find email from name via TSA website
+                        await interaction.showModal(
+                            new ModalBuilder()
+                                .setTitle('Initialize Your Worklog')
+                                .addLabelComponents(
+                                    new LabelBuilder()
+                                        .setLabel("Project Name")
+                                        .setDescription("The name of your project")
+                                        .setTextInputComponent(
+                                            new TextInputBuilder()
+                                                .setCustomId("projectName")
+                                                .setStyle(TextInputStyle.Short)
+                                                .setPlaceholder("Your project name: ")
+                                                .setRequired(true)
+                                        ),
+                                )
+                        );
+
+                        interaction.awaitModalSubmit({
+                            time: 150_000
+                        }).then(async interaction => {
+
+                            interaction.deferReply();
+
+                            const projectName = interaction.fields.getTextInputValue("projectName"),
+                                ownerName   = "test",
+                                ownerEmail  = "2025238@apps.nsd.org";
+                    
+                            const document = await googleClient.drive.files.create({
+                                resource: {
+                                    name: `${projectName} - TSA Worklog`,
+                                    mimeType: "application/vnd.google-apps.document",
+                                    parents: [folderID]
+                                },
+                            }).catch(err => {
+                                console.error("Error creating document:", err);
+                                interaction.followUp("There was an error creating your worklog document. Please shoot @Chthollygirl a dm");
+                            });
+
+                            await googleClient.drive.permissions.create({
+                                fileId: document.data.id,
+                                requestBody: {
+                                    type: "user",
+                                    role: "writer", // or 'reader' if you just want view access
+                                    emailAddress: ownerEmail,
+                                },
+                            }).catch(err => {
+                                console.error("Error sharing document:", err);
+                                interaction.followUp("There was an error creating your worklog document. Please shoot @Chthollygirl a dm");
+                                //TODO check if email is correct
+                            });;
+
+                            interaction.followUp(`Created Document: [${document.data.name}](https://docs.google.com/document/d/${document.data.id}/edit)`);
+
+                        })
+                        .catch(e => {
+                            interaction.followUp("You did not submit the modal in time! Please try again.") 
+                            console.log(e)
+                        });
+
+
+
+                        // await googleClient.docs.documents.batchUpdate({
+                        //     documentId: document.data.id,
+                        //     requestBody: {
+                        //         requests: [{
+                        //             insertText: {
+                        //                 location: { index: 1 },
+                        //                 text: "Test input from worklog bot",
+                        //             },
+                        //         }],
+                        //     },
+                        // });
+
+                        break;
+
+                    case "add":
+                        await interaction.reply("Worklog add command is under development.");
+
+                        break;
+
+                    case "view":
+                        await interaction.reply("Worklog view command is under development.");  
+
+                        break;
+
+                    case "export":
+                        await interaction.reply("Worklog export command is under development.");
+
                         break;
                 }
 
                 break;
+
         }
     }
 }
