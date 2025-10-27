@@ -152,8 +152,17 @@ module.exports = {
         if(interaction) await interaction.reply({ embeds: [embed], ephemeral: true })
 
         console.warn(`----------ERROR----------\n${title}: ${content}\n\n${stack}\n-------------------------`)
-    }
+    },
 
+    disableButtons(components, multiRow = false) {
+
+        if(multiRow) 
+            components.forEach(row => row.components.forEach(component => component.setDisabled(true)));
+        else 
+            components.forEach(component => component.setDisabled(true));
+
+        return components;
+    }
 
 
 

@@ -40,13 +40,8 @@ module.exports = {
             required: false,
         }, {
             name: "entry",
-            description: "The specific entry number you want to view",
-            type: ApplicationCommandOptionType.Integer,
-            required: false,
-        }, {
-            name: "entry_range",
-            description: "View entries within the specified entry numbers. Pulls up a range picker.",
-            type: ApplicationCommandOptionType.Boolean,
+            description: "The specific entry number you want to view. Use [start]-[end] for an entry range.",
+            type: ApplicationCommandOptionType.String,
             required: false,
         }, {
             //TODO: make min/max bound

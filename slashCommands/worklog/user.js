@@ -3,6 +3,8 @@ const { ApplicationCommandType, ApplicationCommandOptionType, ModalBuilder, Embe
 const User = require("../../utils/models/user.js")();
 const Worklog = require("../../utils/models/worklog.js")();
 
+const { disableButtons } = require("../../utils/utils.js");
+
 module.exports = {
     name: "user",
     description: "Set up and manage your user profile!",
@@ -34,7 +36,7 @@ module.exports = {
             case "init":
                 
                 if(await User.exists({ discordId: interaction.user.id })) {
-                    return interaction.reply({
+                    return await interaction.reply({
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Profile Already Initialized")
@@ -61,13 +63,13 @@ module.exports = {
                 )
 
                 interaction.awaitModalSubmit({
-                    time: 3 * 60 * 1000,
+                    time: 180_000,
                 }).then(async interaction => {
                     
                     const fullName = interaction.fields.getTextInputValue("fullName");
                     const user = await User.findOne({ name: fullName });
 
-                    if(!user) return interaction.reply({
+                    if(!user) return await interaction.reply({
                             embeds: [
                                 new EmbedBuilder()
                                     .setTitle("Name Not Found")
@@ -77,15 +79,15 @@ module.exports = {
                             ephemeral: true
                         })
 
-                    interaction.reply({
+                    const response = await interaction.reply({
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Is this you?")
                                 .setDescription(`We found a registered TSA member with the name \`${fullName} (${user.grade}th Grade)\`.\n\n**Email:** ${user.email}\n**Events:** ${user.events?.join(", ") ?? "None"}`)
-                                .setColor("Green")
+                                .setColor("Gray")
                         ],
                         components: [
-                            new ActionRowBuilder()().addComponents(
+                            new ActionRowBuilder().addComponents(
                                 new ButtonBuilder()
                                     .setCustomId("confirmProfileInit")
                                     .setLabel("Yes")
@@ -96,12 +98,65 @@ module.exports = {
                                     .setStyle(ButtonStyle.Danger)
                             )
                         ],
-                        ephemeral: true
+                        ephemeral: true,
+	                    withResponse: true,
                     })
 
-                })
+                    await response.resource.message.awaitMessageComponent({ filter: i => i.user.id === interaction.user.id, time: 120_000 })
+                        .then(async confirmationInteraction => {
+                            if(confirmationInteraction.customId === "confirmProfileInit") {
 
-                await User.create({
+                                await User.findOneAndUpdate({
+                                    name: fullName
+                                }, {
+                                    discordId: interaction.user.id,
+                                    signedUp: true,
+                                });
+
+                                await confirmationInteraction.update({
+                                    embeds: [
+                                        new EmbedBuilder()
+                                            .setTitle("Profile Initialized")
+                                            .setDescription("Your user profile has been successfully initialized!\nUse `/user view` to view your profile.")
+                                            .setColor("Green")
+                                    ],
+                                    components: []
+                                });
+
+                                if(!user.worklogs) return;
+                                
+                                return await confirmationInteraction.followUp({
+                                    embeds: [
+                                        new EmbedBuilder()
+                                            .setTitle("Worklogs Found")
+                                            .setDescription("We found existing worklogs associated with your profile for the following events:\n- **" + user.events.join("**\n- **")+"**\nYou can view them using the `/worklog worklogs` command.")
+                                            .setColor("Green")
+                                    ]
+                                })
+
+                            } else {
+                               return await confirmationInteraction.update({
+                                    embeds: [
+                                        new EmbedBuilder()
+                                            .setTitle("Initialization Cancelled")
+                                            .setDescription("Profile initialization has been cancelled. Please ensure you enter your name exactly as you did when signing up for TSA.\nYou may run the `/user init` command again to reattempt profile initialization.")
+                                            .setColor("Red")
+                                    ],
+                                    components: []
+                                });
+                            }
+                        })
+                        .catch(async () => {
+                            return await confirmationInteraction.update({
+                                embeds: [
+                                    new EmbedBuilder()
+                                        .setTitle("Initialization Timed Out")
+                                        .setDescription("You did not respond in time. Please run the `/user init` command again to reattempt profile initialization.")
+                                        .setColor("Red")
+                                ],
+                                components: [disableButtons(response.resource.message.components[0].components)]
+                            })
+                        });
 
                 })
 
