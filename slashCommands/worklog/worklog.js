@@ -8,7 +8,7 @@ const {
 } = require("discord.js");
 const { googleClient } = require("../../index.js");
 
-const { Database } = require("../../utils/utils.js");
+const User = require("../../utils/models/user.js");
 
 const folderID = "1Kj7zdg_ccnVvT9F7epl5bYN1kK8GMy47";
 
@@ -72,8 +72,7 @@ module.exports = {
     async autoComplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
 
-        //await IS required(I think), ignore warning
-        const user = await Database.userExist(interaction.user.id);
+        const user = await User.exists({ discordId: interaction.user.id });
 
         if(!user) return await interaction.respond({
             name: "Please initialize your user profile first using /user init",
@@ -84,9 +83,9 @@ module.exports = {
             case "switch":
 
                 await interaction.respond(
-                    user.worklogs
-                    .filter(worklog => worklog.name.toLowerCase().includes(focusedOption.value.toLowerCase()))
-                    .map(worklog => ({ name: worklog.name, value: worklog._id.toString() }))
+                    // user.worklogs
+                    // .filter(worklog => worklog.name.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    // .map(worklog => ({ name: worklog.name, value: worklog._id.toString() }))
                 );
                 break;
         }
@@ -140,7 +139,7 @@ module.exports = {
 
                             const projectName = interaction.fields.getTextInputValue("projectName"),
                                 ownerName   = "test",
-                                ownerEmail  = "2025238@apps.nsd.org";
+                                ownerEmail  = "";
                     
                             const document = await googleClient.drive.files.create({
                                 resource: {

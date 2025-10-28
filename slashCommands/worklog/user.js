@@ -14,7 +14,7 @@ const {
 const User = require("../../utils/models/user.js")();
 const Worklog = require("../../utils/models/worklog.js")();
 
-const { disableButtons, Errors } = require("../../utils/utils.js");
+const { Message, Errors } = require("../../utils/utils.js");
 
 module.exports = {
     name: "user",
@@ -30,11 +30,11 @@ module.exports = {
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "view",
-        description: "View your user profile, which displays information such as you worklogs and events.",
+        description: "View your private user profile, which displays information such as you worklogs and emails. Only you can see this information.",
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "profile",
-        description: "Displays your public profile, which includes current/past events and significant placements",
+        description: "Displays your public profile, which includes current/past events and significant placements.",
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "delete",
@@ -91,11 +91,21 @@ module.exports = {
                             ephemeral: true
                         })
 
+                    if(user.signedUp) return await modalInteraction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("Profile Already Initialized")
+                                .setDescription(`The TSA member profile for \`${fullName}\` has already been initialized with the Discord account <@${user.discordId}>.`)
+                                .setColor("Red")
+                        ],
+                        ephemeral: true
+                    })
+
                     const response = await modalInteraction.reply({
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Is this you?")
-                                .setDescription(`We found a registered TSA member with the name ***${user.name}***.\n**Grade:** ${user.grade}\n**Email:** ${user.email}\n**Events:** *${user.events?.join(", ") ?? "None"}*`)
+                                .setDescription(`We found a registered TSA member with the name ***${user.name}***.\n**Grade:** ${user.grade}\n**School Email:** ${user.email[0]}\n**Events:** *${user.events?.join(", ") ?? "None"}*`)
                                 .setColor("Grey")
                         ],
                         components: [
@@ -157,11 +167,10 @@ module.exports = {
                             }
                         })
                         .catch(async (e) => {
-                            console.log(e)
                             Errors.timeOut(modalInteraction, e);
 
                             return await modalInteraction.editReply({
-                                components: [new ActionRowBuilder({components: disableButtons(response.resource.message.components[0].components)})]
+                                components: [new ActionRowBuilder({components: Message.disableButtons(response.resource.message.components[0].components)})]
                             })
 
                         });
@@ -170,10 +179,33 @@ module.exports = {
 
                 break;
             case "settings":
+            case "view":
+            case "profile":
+            case "delete":
+                if(!(await User.exists({ discordId: interaction.user.id }))) {
+                    return await interaction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("Profile Not Initialized")
+                                .setDescription("You have not initialized your user profile. Please run the `/user init` command to set up your profile.")
+                                .setColor("Red")
+                    ], ephemeral: true });
+                }
+
+                const user = await User.findOne({ discordId: interaction.user.id });
+
+                //no break, fall through to respective cases if user exists
+            case "settings":
                 return await interaction.reply("User settings command is under development.");
                 break;
             case "view":
-                return await interaction.reply("User view command is under development.");
+                
+                return await interaction.reply({
+                    components: [
+
+                    ],
+                    ephemeral: true
+                });
                 break;
             case "profile":
                 return await interaction.reply("User profile command is under development.");

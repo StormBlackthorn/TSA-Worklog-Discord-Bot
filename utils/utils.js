@@ -113,22 +113,6 @@ module.exports = {
         },
     },
 
-    /**
-     * Collection of utility functions related to database operations
-     */
-    Database: {
-        /**
-         * Checks if a user exists in the db
-         * @param {String} discordId the discord ID
-         * @returns { user | Boolean }  Check if the user exists. Returns the user object if exists, else return false
-         */
-        userExist: async (discordId) => {
-            const user = await Users.findOne({ discordId }).populate("worklogs");
-            return user ?? false;
-        },
-    
-    },
-
     Errors: {
         /**
          * Sends error to webhook and log it in console, optionally replying the user with the error
@@ -188,16 +172,56 @@ module.exports = {
         }
     },
     
+    Message: {
+        
+        /**
+         * Disables buttons in the given components
+         * @param { Components } components The components to disable
+         * @param { Boolean } multiRow Whether there are multiple rows of components
+         * @returns { Components } The modified components with disabled buttons
+         */
+        disableButtons(components, multiRow = false) {
+            const returned = [];
 
-    disableButtons(components, multiRow = false) {
-        const returned = [];
+            if(multiRow) 
+                components.map(row => row.components.map(component => returned.push(ButtonBuilder.from(component).setDisabled(true))));
+            else 
+                components.map(component => returned.push((ButtonBuilder.from(component).setDisabled(true))));
+            return returned;
+        },
 
-        if(multiRow) 
-            components.map(row => row.components.map(component => returned.push(ButtonBuilder.from(component).setDisabled(true))));
-        else 
-            components.map(component => returned.push((ButtonBuilder.from(component).setDisabled(true))));
-        return returned;
-    }
+        /**
+         * Creates pagination for the given pages, and adds a navigation button row. Handles button interactions automatically.
+         * @param { Array<MessageComponentV2> } pages
+         */
+        async pages({interaction, pages, ephemeral = true}) {
+
+            const currentPage = 0;
+
+            const response = interaction.reply({
+                components: [
+                    pages[0]
+                ],
+                ephemeral: ephemeral,
+            })
+
+            await response.resource.message.awaitMessageComponent({ filter: i => i.user.id === interaction.user.id, time: 300_000 })
+                .then(async (buttonInteraction) => {
+                    //handle button interaction
+                })
+                .catch(async (e) => {
+                    module.exports.Errors.timeOut(interaction, e);
+
+                    return await interaction.editReply({
+                        components: [new ActionRowBuilder({components: Message.disableButtons(response.resource.message.components[0].components)})]
+                    })
+
+                });
+
+
+        }
+    },
+
 
 
 
