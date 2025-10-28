@@ -139,7 +139,7 @@ module.exports = {
                                     embeds: [
                                         new EmbedBuilder()
                                             .setTitle("Worklogs Found")
-                                            .setDescription("We found existing worklogs associated with your profile for the following events:\n- **" + user.events.join("**\n- **")+"**\nYou can view them using the `/worklog worklogs` command.")
+                                            .setDescription("We found existing worklogs associated with your profile for the following events:\n- **" + user.events.join("**\n- **")+"**\nYou can view them using the `/worklog worklogs list` command.")
                                             .setColor("Green")
                                     ]
                                 })
@@ -168,6 +168,18 @@ module.exports = {
 
                 }).catch(async (e) => Errors.timeOut(interaction, e));
 
+                break;
+            case "settings":
+                return await interaction.reply("User settings command is under development.");
+                break;
+            case "view":
+                return await interaction.reply("User view command is under development.");
+                break;
+            case "profile":
+                return await interaction.reply("User profile command is under development.");
+                break;
+            case "delete":
+                return await interaction.reply("User delete command is under development.");
                 break;
         }
     }
