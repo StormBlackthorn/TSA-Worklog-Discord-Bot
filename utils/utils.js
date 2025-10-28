@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { EmbedBuilder, WebhookClient } = require("discord.js");
+const { EmbedBuilder, WebhookClient, ButtonBuilder } = require("discord.js");
 require('dotenv').config({debug: false});
 
 const webHook = new WebhookClient({ url: process.env.WEBHOOK_URL });
@@ -129,39 +129,74 @@ module.exports = {
     
     },
 
-    /**
-     * Sends error to webhook and log it in console, optionally replying the user with the error
-     * @param { Object } error the error object 
-     * @param { String } error.stack The error stack trace
-     * @param { String } error.content The error content/message
-     * @param { String } error.title The error title
-     * @param { Interaction } error.interaction The interaction to reply to (optional)
-     */
-    errorMessage: async ({ stack, content="ERROR", title="ERROR", interaction }) => {
-        const embed = new EmbedBuilder()
-            .setTitle(title)
-            .setColor('Red')
-            .setDescription(`***${content}***\n\n\`\`\`sh\n${stack.length > 2000 ? stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : stack}\`\`\` `)
-            .setTimestamp()
+    Errors: {
+        /**
+         * Sends error to webhook and log it in console, optionally replying the user with the error
+         * @param { Object } error the error object 
+         * @param { String } error.stack The error stack trace
+         * @param { String } error.content The error content/message
+         * @param { String } error.title The error title
+         * @param { Interaction } error.interaction The interaction to reply to (optional)
+         * @param { Boolean } error.followUp Whether to use followUp instead of reply (optional)
+         */
+        errorMessage: async ({ stack, content="ERROR", title="ERROR", interaction, followUp=false }) => {
+            const embed = new EmbedBuilder()
+                .setTitle(title)
+                .setColor('Red')
+                .setDescription(`***${content}***\n\n\`\`\`sh\n${stack.length > 2000 ? stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : stack}\`\`\` `)
+                .setTimestamp()
 
-        await webHook.send({
-            content: `<@1409557350729257090>`,
-            embeds: [embed]
-        })
-        
-        if(interaction) await interaction.reply({ embeds: [embed], ephemeral: true })
+            await webHook.send({
+                content: `<@1409557350729257090>`,
+                embeds: [embed]
+            })
+            
+            if(interaction) {
+                if(followUp) await interaction.followUp({ embeds: [embed], ephemeral: true });
+                else await interaction.reply({ embeds: [embed], ephemeral: true });
+            }
 
-        console.warn(`----------ERROR----------\n${title}: ${content}\n\n${stack}\n-------------------------`)
+            console.warn(`----------ERROR----------\n${title}: ${content}\n\n${stack}\n-------------------------`)
+        },
+
+        /**
+         * Handles a timeout error for an interaction, and throws an error message if it is not a timeout
+         * @param {Interaction} interaction the interaction to respond to
+         * @param {Error} error the error object
+         */
+        async timeOut(interaction, error) {
+
+            if(error.message !== "Collector received no interactions before ending with reason: time") {
+                return this.errorMessage({
+                    stack: error.stack,
+                    content: error.message,
+                    title: "Error during profile initialization confirmation",
+                    interaction: interaction,
+                    followUp: true
+                })  
+            }
+
+            return await interaction.followUp({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Interaction Timed Out")
+                        .setDescription("You did not respond in time. Please use the command again.")
+                        .setColor("Red")
+                ],
+                ephemeral: true
+            })
+        }
     },
+    
 
     disableButtons(components, multiRow = false) {
+        const returned = [];
 
         if(multiRow) 
-            components.forEach(row => row.components.forEach(component => component.setDisabled(true)));
+            components.map(row => row.components.map(component => returned.push(ButtonBuilder.from(component).setDisabled(true))));
         else 
-            components.forEach(component => component.setDisabled(true));
-
-        return components;
+            components.map(component => returned.push((ButtonBuilder.from(component).setDisabled(true))));
+        return returned;
     }
 
 

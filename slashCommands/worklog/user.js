@@ -1,9 +1,20 @@
-const { ApplicationCommandType, ApplicationCommandOptionType, ModalBuilder, EmbedBuilder, LabelBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
+const { 
+    ApplicationCommandType, 
+    ApplicationCommandOptionType, 
+    ModalBuilder, 
+    EmbedBuilder, 
+    LabelBuilder, 
+    TextInputBuilder, 
+    TextInputStyle, 
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require("discord.js");
 
 const User = require("../../utils/models/user.js")();
 const Worklog = require("../../utils/models/worklog.js")();
 
-const { disableButtons } = require("../../utils/utils.js");
+const { disableButtons, Errors } = require("../../utils/utils.js");
 
 module.exports = {
     name: "user",
@@ -48,6 +59,7 @@ module.exports = {
                 await interaction.showModal(
                     new ModalBuilder()
                         .setTitle("Initialize Your User Profile")
+                        .setCustomId("userProfileInitModal")
                         .addLabelComponents(
                             new LabelBuilder()
                                 .setLabel("Full Name")
@@ -64,27 +76,27 @@ module.exports = {
 
                 interaction.awaitModalSubmit({
                     time: 180_000,
-                }).then(async interaction => {
+                }).then(async modalInteraction => {
                     
-                    const fullName = interaction.fields.getTextInputValue("fullName");
-                    const user = await User.findOne({ name: fullName });
+                    const fullName = modalInteraction.fields.getTextInputValue("fullName");
+                    const user = await User.findOne({ name: fullName }).collation({ locale: 'en', strength: 1 });
 
-                    if(!user) return await interaction.reply({
+                    if(!user) return await modalInteraction.reply({
                             embeds: [
                                 new EmbedBuilder()
                                     .setTitle("Name Not Found")
-                                    .setDescription(`We could not find a registered TSA member named ${fullName} in our database. Please ensure you entered your name exactly as you did when signing up for TSA.\nContact @Chthollygirl if you believe that this is a mistake.`)
+                                    .setDescription(`We could not find a registered TSA member named \`${fullName}\` in our database. Please ensure you entered your name exactly as you did when signing up for TSA.\nContact @Chthollygirl if you believe that this is a mistake.`)
                                     .setColor("Red")
                             ],
                             ephemeral: true
                         })
 
-                    const response = await interaction.reply({
+                    const response = await modalInteraction.reply({
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Is this you?")
-                                .setDescription(`We found a registered TSA member with the name \`${fullName} (${user.grade}th Grade)\`.\n\n**Email:** ${user.email}\n**Events:** ${user.events?.join(", ") ?? "None"}`)
-                                .setColor("Gray")
+                                .setDescription(`We found a registered TSA member with the name ***${user.name}***.\n**Grade:** ${user.grade}\n**Email:** ${user.email}\n**Events:** *${user.events?.join(", ") ?? "None"}*`)
+                                .setColor("Grey")
                         ],
                         components: [
                             new ActionRowBuilder().addComponents(
@@ -102,16 +114,14 @@ module.exports = {
 	                    withResponse: true,
                     })
 
-                    await response.resource.message.awaitMessageComponent({ filter: i => i.user.id === interaction.user.id, time: 120_000 })
+                    await response.resource.message.awaitMessageComponent({ filter: i => i.user.id === modalInteraction.user.id, time: 120_000 })
                         .then(async confirmationInteraction => {
                             if(confirmationInteraction.customId === "confirmProfileInit") {
 
-                                await User.findOneAndUpdate({
-                                    name: fullName
-                                }, {
-                                    discordId: interaction.user.id,
-                                    signedUp: true,
-                                });
+
+                                user.discordId = modalInteraction.user.id;
+                                user.signedUp = true;
+                                await user.save();
 
                                 await confirmationInteraction.update({
                                     embeds: [
@@ -146,19 +156,17 @@ module.exports = {
                                 });
                             }
                         })
-                        .catch(async () => {
-                            return await confirmationInteraction.update({
-                                embeds: [
-                                    new EmbedBuilder()
-                                        .setTitle("Initialization Timed Out")
-                                        .setDescription("You did not respond in time. Please run the `/user init` command again to reattempt profile initialization.")
-                                        .setColor("Red")
-                                ],
-                                components: [disableButtons(response.resource.message.components[0].components)]
+                        .catch(async (e) => {
+                            console.log(e)
+                            Errors.timeOut(modalInteraction, e);
+
+                            return await modalInteraction.editReply({
+                                components: [new ActionRowBuilder({components: disableButtons(response.resource.message.components[0].components)})]
                             })
+
                         });
 
-                })
+                }).catch(async (e) => Errors.timeOut(interaction, e));
 
                 break;
         }

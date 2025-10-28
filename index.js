@@ -3,7 +3,7 @@ const { glob } = require('glob');
 const { google } = require('googleapis');
 const readline = require("node:readline");
 const mongoose = require("mongoose");
-const { Events, errorMessage } = require("./utils/utils.js")
+const { Events, Errors } = require("./utils/utils.js")
 require('dotenv').config({debug: false});
 
 const client = new Client({ //TODO: figure out exactly which intents and partials are needed
@@ -91,7 +91,7 @@ Events.fetchEventsData();
 
 
 process.on('uncaughtException', (err, origin) => {
-	errorMessage({
+	Errors.errorMessage({
 		stack: err.stack, 
 		content: `${err} [ ${origin} ]`, 
 		title: "UncaughtException Error"
@@ -99,7 +99,7 @@ process.on('uncaughtException', (err, origin) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-	errorMessage({
+	Errors.errorMessage({
 		stack: reason.stack,
 		content: reason,
 		title: "UnhandledRejection Error"

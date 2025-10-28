@@ -14,7 +14,7 @@ const UserSchema = new Schema({
     grade:     { type: Number, required: true},
 });
 
-
+UserSchema.index({ name: 1 }, { collation: { locale: 'en', strength: 1 } });
 
 // IMPORTANT: "User" is model name; Mongoose automatically makes the collection name plural (i.e., "Users")
 module.exports = () => {

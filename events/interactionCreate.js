@@ -1,12 +1,11 @@
 const {
 	EmbedBuilder,
 	PermissionsBitField,
-	Embed,
 } = require('discord.js');
 
 const { client } = require("../index.js");
 
-const { errorMessage } = require("../utils/utils.js");
+const { Errors } = require("../utils/utils.js");
 
 
 module.exports = {
@@ -41,7 +40,7 @@ module.exports = {
 			}
 			await slashCommand.run(client, interaction);
 		} catch (error) {
-			errorMessage({
+			Errors.errorMessage({
 				stack: error.stack,
 				content: error,
 				title: "SlashCommand Error",
