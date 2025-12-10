@@ -41,9 +41,18 @@ const googleClient = {};
 		"urn:ietf:wg:oauth:2.0:oob" // Add the redirect URI here
 	);
 
-	if(process.env.GOOGLE_AUTH_REFRESH_TOKEN) 
+	let validToken = false;
+	if(process.env.GOOGLE_AUTH_REFRESH_TOKEN) {
 		oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_AUTH_REFRESH_TOKEN });
-	else {
+		try {
+			await oAuth2Client.getAccessToken();
+			validToken = true;
+		} catch (e) {
+			console.log("Invalid Refresh Token in .env, falling back to manual auth...");
+		}
+	}
+	
+	if(!validToken) {
 
 		console.log('Authorize this app by visiting this url:', oAuth2Client.generateAuthUrl({
 			access_type: 'offline',
@@ -65,9 +74,9 @@ const googleClient = {};
 			});
 		});
 
-		const token = await oAuth2Client.getToken(code).tokens;
-		oAuth2Client.setCredentials(token);
-		console.log(await oAuth2Client.getToken(code));
+		const { tokens } = await oAuth2Client.getToken(code);
+		oAuth2Client.setCredentials(tokens);
+		console.log("Refresh Token:", tokens.refresh_token);
 
 	}
 

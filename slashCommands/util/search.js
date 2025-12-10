@@ -117,7 +117,7 @@ module.exports = {
                         new EmbedBuilder()
                             .setTitle("Invalid event")
                             .setDescription(`**${eventName}** is not a valid event.`)
-                            .setColor("Red")>b
+                            .setColor("Red")
                     ],
                     ephemeral: true
                 });

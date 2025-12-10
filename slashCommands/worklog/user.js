@@ -8,11 +8,12 @@ const {
     TextInputStyle, 
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
 } = require("discord.js");
 
 const User = require("../../utils/models/user.js")();
 const Worklog = require("../../utils/models/worklog.js")();
+const Event = require("../../utils/models/event.js")();
 
 const { Message, Errors } = require("../../utils/utils.js");
 
@@ -21,8 +22,8 @@ module.exports = {
     description: "Set up and manage your user profile!",
     type: ApplicationCommandType.ChatInput,
     options : [{
-        name: "init",
-        description: "Initialize your user profile",
+        name: "register",
+        description: "Initialize/register your user profile",
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "settings",
@@ -30,35 +31,41 @@ module.exports = {
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "view",
-        description: "View your private user profile, which displays information such as you worklogs and emails. Only you can see this information.",
+        description: "View your private profile, which displays infos such as your worklogs. Only you can see this message",
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "profile",
-        description: "Displays your public profile, which includes current/past events and significant placements.",
+        description: "Displays your public profile, which includes current/past events and significant placements",
         type: ApplicationCommandOptionType.Subcommand
     }, {
         name: "delete",
-        description: "Delete your user profile and all associated data (worklogs, etc). This action is irreversible.",
+        description: "Delete your user profile and all associated data (worklogs, etc). This action is irreversible",
         type: ApplicationCommandOptionType.Subcommand
     }],
 
     async run(client, interaction) {
-        switch(interaction.options.getSubcommand()) {
-            case "init":
+
+        const subcommand = interaction.options.getSubcommand();
+
+        let user = await User.findOne({ discordId: interaction.user.id });
+        if(subcommand !== "register" && !user) return await interaction.reply({ embeds: [Message.notRegisteredEmbed], ephemeral: true });
+        
+        switch(subcommand) {
+            case "register":
                 
                 if(await User.exists({ discordId: interaction.user.id })) {
                     return await interaction.reply({
                         embeds: [
                             new EmbedBuilder()
-                                .setTitle("Profile Already Initialized")
-                                .setDescription("You have already initialized your user profile.")
+                                .setTitle("Profile Already Registered")
+                                .setDescription("You have already registered your user profile.")
                                 .setColor("Red")
                     ], ephemeral: true });
                 }
 
                 await interaction.showModal(
                     new ModalBuilder()
-                        .setTitle("Initialize Your User Profile")
+                        .setTitle("Register Your User Profile")
                         .setCustomId("userProfileInitModal")
                         .addLabelComponents(
                             new LabelBuilder()
@@ -79,23 +86,23 @@ module.exports = {
                 }).then(async modalInteraction => {
                     
                     const fullName = modalInteraction.fields.getTextInputValue("fullName");
-                    const user = await User.findOne({ name: fullName }).collation({ locale: 'en', strength: 1 });
+                    const user = await User.findOne({ name: fullName }).collation({ locale: 'en', strength: 1 }).populate("events");
 
                     if(!user) return await modalInteraction.reply({
                             embeds: [
                                 new EmbedBuilder()
                                     .setTitle("Name Not Found")
-                                    .setDescription(`We could not find a registered TSA member named \`${fullName}\` in our database. Please ensure you entered your name exactly as you did when signing up for TSA.\nContact @Chthollygirl if you believe that this is a mistake.`)
+                                    .setDescription(`We could not find a valid TSA member named \`${fullName}\` in our database. Please ensure you entered your name exactly as you did when signing up for TSA.\nContact @Chthollygirl if you believe that this is a mistake.`)
                                     .setColor("Red")
                             ],
                             ephemeral: true
                         })
 
-                    if(user.signedUp) return await modalInteraction.reply({
+                    if(user.verified) return await modalInteraction.reply({
                         embeds: [
                             new EmbedBuilder()
-                                .setTitle("Profile Already Initialized")
-                                .setDescription(`The TSA member profile for \`${fullName}\` has already been initialized with the Discord account <@${user.discordId}>.`)
+                                .setTitle("Profile Already Registered")
+                                .setDescription(`The TSA member profile for \`${fullName}\` has already been registered with the Discord account <@${user.discordId}>.`)
                                 .setColor("Red")
                         ],
                         ephemeral: true
@@ -105,7 +112,7 @@ module.exports = {
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Is this you?")
-                                .setDescription(`We found a registered TSA member with the name ***${user.name}***.\n**Grade:** ${user.grade}\n**School Email:** ${user.email[0]}\n**Events:** *${user.events?.join(", ") ?? "None"}*`)
+                                .setDescription(`We found a TSA member with the name ***${user.name}***.\n**Grade:** ${user.grade}\n**School Email:** ${user.email[0]}\n**Events:** *${user.events?.map(e => e.name).join(", ") ?? "None"}*`)
                                 .setColor("Grey")
                         ],
                         components: [
@@ -130,26 +137,32 @@ module.exports = {
 
 
                                 user.discordId = modalInteraction.user.id;
-                                user.signedUp = true;
-                                await user.save();
+                                user.verified = true;
 
                                 await confirmationInteraction.update({
                                     embeds: [
                                         new EmbedBuilder()
-                                            .setTitle("Profile Initialized")
-                                            .setDescription("Your user profile has been successfully initialized!\nUse `/user view` to view your profile.")
+                                            .setTitle("Profile Registered")
+                                            .setDescription("Your user profile has been successfully registered!\nUse `/user view` to view your profile.")
                                             .setColor("Green")
                                     ],
                                     components: []
                                 });
 
+                                //find all events with a worklog and with this user
+                                (await Event.find({worklog: {$exists: true}, members: { $in: [user._id] }})).forEach(worklog => {
+                                    if(!user.events) user.events = [];
+                                    user.events.push(worklog._id);
+                                })
+
+                                await user.save();
                                 if(!user.worklogs) return;
-                                
+
                                 return await confirmationInteraction.followUp({
                                     embeds: [
                                         new EmbedBuilder()
                                             .setTitle("Worklogs Found")
-                                            .setDescription("We found existing worklogs associated with your profile for the following events:\n- **" + user.events.join("**\n- **")+"**\nYou can view them using the `/worklog worklogs list` command.")
+                                            .setDescription("We found existing worklogs associated with your profile for the following events:\n- **" + user.events.map(n => n.name).join("**\n- **")+"**\nYou can view them using the `/worklog worklogs list` command.")
                                             .setColor("Green")
                                     ]
                                 })
@@ -158,8 +171,8 @@ module.exports = {
                                return await confirmationInteraction.update({
                                     embeds: [
                                         new EmbedBuilder()
-                                            .setTitle("Initialization Cancelled")
-                                            .setDescription("Profile initialization has been cancelled. Please ensure you enter your name exactly as you did when signing up for TSA.\nYou may run the `/user init` command again to reattempt profile initialization.")
+                                            .setTitle("Registration Cancelled")
+                                            .setDescription("Profile registration has been cancelled. Please ensure you enter your name exactly as you did when signing up for TSA.\nYou may run the `/user register` command again to reattempt profile registration.")
                                             .setColor("Red")
                                     ],
                                     components: []
@@ -178,23 +191,7 @@ module.exports = {
                 }).catch(async (e) => Errors.timeOut(interaction, e));
 
                 break;
-            case "settings":
-            case "view":
-            case "profile":
-            case "delete":
-                if(!(await User.exists({ discordId: interaction.user.id }))) {
-                    return await interaction.reply({
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle("Profile Not Initialized")
-                                .setDescription("You have not initialized your user profile. Please run the `/user init` command to set up your profile.")
-                                .setColor("Red")
-                    ], ephemeral: true });
-                }
 
-                const user = await User.findOne({ discordId: interaction.user.id });
-
-                //no break, fall through to respective cases if user exists
             case "settings":
                 return await interaction.reply("User settings command is under development.");
                 break;

@@ -68,7 +68,7 @@ module.exports = {
          * @returns { Array<String> | Boolean } List of event names or false if member does not exist
          */
         getEventsFromMember(name) {
-            if(!module.exports.memberExist(name)) return false;
+            if(!module.exports.Events.memberExist(name)) return false;
 
             const returned = [];
             const events = require("./config/events.json");
@@ -92,7 +92,7 @@ module.exports = {
          * @returns {Boolean} Whether the member exists
          */
         memberExist(name) {
-            return module.exports.allMembers.includes(name);
+            return module.exports.Events.allMembers.includes(name);
         },
 
         /**
@@ -109,7 +109,7 @@ module.exports = {
          * @returns {Array<Array<String>>} List of member names
          */
         getEventMembersFromEvent(eventName) {
-            return module.exports.getEventsData()[eventName] || [];
+            return module.exports.Events.getEventsData()[eventName] || [];
         },
     },
 
@@ -218,10 +218,18 @@ module.exports = {
 
                 });
 
+        },
 
-        }
+        /**
+         * Returns an embed that has the "You are not registered" message
+         */
+        notRegisteredEmbed: new EmbedBuilder()
+            .setTitle("Not Registered")
+            .setDescription("You are not registered. Please register using `/user register` to use this command.")
+            .setColor("Red"),
+        
+        
     },
-
 
 
 
