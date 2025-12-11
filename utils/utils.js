@@ -127,7 +127,7 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle(title)
                 .setColor('Red')
-                .setDescription(`***${content}***\n\n\`\`\`sh\n${stack.length > 2000 ? stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : stack}\`\`\` `)
+                .setDescription(`The developer(me)(@chthollygirl) has been notified. Feel free to send me a DM as well. \n***${content}***\n\n\`\`\`sh\n${stack.length > 2000 ? stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : stack}\`\`\` `)
                 .setTimestamp()
 
             await webHook.send({
@@ -154,7 +154,7 @@ module.exports = {
                 return this.errorMessage({
                     stack: error.stack,
                     content: error.message,
-                    title: "Error during profile initialization confirmation",
+                    title: "An unknown error occurred.",
                     interaction: interaction,
                     followUp: true
                 })  

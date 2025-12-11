@@ -10,7 +10,8 @@ const client = new Client({ //TODO: figure out exactly which intents and partial
     intents: [
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildPresences, 
-		
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages,
     ], 
     partials: [Partials.Channel, Partials.Message, Partials.User, Partials.GuildMember] 

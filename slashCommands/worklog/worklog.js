@@ -12,6 +12,7 @@ const {
     ContainerBuilder,
     MessageFlags,
     ButtonStyle,
+    LabelBuilder,
 } = require("discord.js");
 const { googleClient } = require("../../index.js");
 
@@ -19,7 +20,7 @@ const User = require("../../utils/models/user.js")();
 const Worklog = require("../../utils/models/worklog.js")();
 const eventsData = require("../../utils/config/events.json");
 const worklog = require("../../utils/models/worklog.js");
-const { Message } = require("../../utils/utils.js");
+const { Message, Errors } = require("../../utils/utils.js");
 
 const folderID = "1Kj7zdg_ccnVvT9F7epl5bYN1kK8GMy47";
 
@@ -32,8 +33,8 @@ module.exports = {
         description: "Add to your worklog",
         type: ApplicationCommandOptionType.Subcommand
     }, {
-        name: "init",
-        description: "Initialize your worklog",
+        name: "create",
+        description: "Create your worklog for an event",
         type: ApplicationCommandOptionType.Subcommand,
     }, {
         name: "view",
@@ -113,7 +114,14 @@ module.exports = {
 
                 const filtered = user.worklogs.filter(worklog => 
                     worklog.event.name.toLowerCase().includes(focusedOption.value.toLowerCase())
+                    && worklog._id.toString() !== user.activeWorklog?.toString()
                 );
+
+                if (filtered.length === 0) return await interaction.respond([{
+                        name: "No other worklogs to switch to",
+                        value: "-3"
+                    }]);
+                
 
                 await interaction.respond(
                     filtered.map(worklog => ({ name: worklog.event.name, value: worklog._id.toString() }))
@@ -187,20 +195,33 @@ module.exports = {
             case "switch": {
                 const worklogId = interaction.options.getString("worklog");
 
-                if(worklogId === "-1") return await interaction.reply({ embeds: [Message.notRegisteredEmbed], ephemeral: true });
-                if(worklogId === "-2") return await interaction.reply({ embeds: [
-                    new EmbedBuilder()
-                        .setTitle("No worklogs")
-                        .setDescription("You have no worklogs. Set one up using `/worklog init`.")
-                        .setColor("Red") 
-                ], ephemeral: true });
+                switch(worklogId) {
+                    case "-1":
+                        return await interaction.reply({ embeds: [Message.notRegisteredEmbed], ephemeral: true });
+                    case "-2":
+                        return await interaction.reply({ embeds: [
+                            new EmbedBuilder()
+                                .setTitle("No worklogs")
+                                .setDescription("You have no worklogs. Set one up using `/worklog create`.")
+                                .setColor("Red") 
+                            ], ephemeral: true });
+                    case "-3":
+                        return await interaction.reply({ embeds: [
+                            new EmbedBuilder()
+                                .setTitle("No other worklogs")
+                                .setDescription("You have no other worklogs to switch to.")
+                                .setColor("Red") 
+                            ], ephemeral: true });
+                }
+
+
 
                 if(!user.worklogs?.includes(worklogId)) return await interaction.reply({ embeds: [
                     new EmbedBuilder()
                         .setTitle("Invalid worklog")
                         .setDescription("The worklog you selected was invalid.")
                         .setColor("Red")
-                ], ephemeral: true });
+                    ], ephemeral: true });
                 
                 user.activeWorklog = worklogId;
                 await user.save();
@@ -219,115 +240,104 @@ module.exports = {
                             .setButtonAccessory((button) => button.setLabel("Worklog Link").setStyle(ButtonStyle.Link).setURL(worklog.link)),
                         )   
 
-                ], flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral] });
+                    ], flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral] });
 
             }
             
-            case "init": {
+            case "create": {
 
                 user = await (await user.populate("events")).populate("worklogs");
+                //I dont even know what I'm writing anymore man
+                const availableEvents = (user.events?.filter(event => !user.worklogs.some(worklog => worklog.event._id.toString() === event._id.toString()))) || [];
 
-                const userEvents = user.events || [];
-                const existingWorklogNames = (user.worklogs || []).map(w => w.name);
-                const availableEvents = userEvents.filter(e => !existingWorklogNames.includes(e));
-
-                if (availableEvents.length === 0) {
-                    return await interaction.reply({ content: "You have no events available to initialize a worklog for.", ephemeral: true });
-                }
-
-                const selectMenu = new StringSelectMenuBuilder()
-                    .setCustomId('init_event_select')
-                    .setPlaceholder('Select an event')
-                    .addOptions(
-                        availableEvents.map(event => 
-                            new StringSelectMenuOptionBuilder()
-                                .setLabel(event.name)
-                                .setValue(event.name)
+                if (availableEvents.length === 0) return await interaction.reply({ 
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle("No Available Events")
+                            .setDescription("You have no available events to create a worklog for. Either you have worklogs for all your events or you are not part of any events.")
+                            .setColor("Red")
+                    ], ephemeral: true });
+                
+                await interaction.showModal(
+                    new ModalBuilder()
+                        .setCustomId('createWorklogModal')
+                        .setTitle('Create a New Worklog')
+                        .addLabelComponents(
+                            new LabelBuilder()
+                                .setLabel("Event")
+                                .setDescription("Select the event you want to create a worklog for.")
+                                .setStringSelectMenuComponent(
+                                    new StringSelectMenuBuilder()
+                                    .setCustomId('eventSelection')
+                                    .setPlaceholder('Select an event')
+                                    .addOptions(
+                                        availableEvents.map(event => 
+                                            new StringSelectMenuOptionBuilder()
+                                                .setLabel(event.name)
+                                                .setValue(event.name)
+                                        )
+                                    )
+                                )
                         )
-                    );
+                )
 
-                const row = new ActionRowBuilder().addComponents(selectMenu);
-
-                const response = await interaction.reply({
-                    content: 'Select the event you want to initialize a worklog for:',
-                    components: [row],
-                    ephemeral: true
-                });
-
-                try {
-                    const confirmation = await response.awaitMessageComponent({ filter: i => i.user.id === interaction.user.id, time: 60000, componentType: ComponentType.StringSelect });
-
-                    const projectName = confirmation.values[0];
-                    await confirmation.deferUpdate();
-                    await interaction.editReply({ content: `Initializing worklog for **${projectName}**...`, components: [] });
-
-                    const ownerEmail = user.email[0]; 
+                interaction.awaitModalSubmit({
+                    time: 120_000,
+                }).then(async modalInteraction => {
+                    const eventName = modalInteraction.fields.getStringSelectValues("eventSelection")[0];
+                    const response = await modalInteraction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("Creating Worklog")
+                                .setDescription(`Creating worklog for **${eventName}**...`)
+                                .setColor("Green")
+                        ], ephemeral: true })
 
                     const document = await googleClient.drive.files.create({
                         resource: {
-                            name: `${projectName} - TSA Worklog`,
+                            name: `${eventName} - TSA Worklog`,
                             mimeType: "application/vnd.google-apps.document",
                             parents: [folderID]
                         },
-                    }).catch(err => {
-                        console.error("Error creating document:", err);
-                        interaction.editReply("There was an error creating your worklog document. Please shoot @Chthollygirl a dm");
-                        return null;
-                    });
-
-                    if (!document) return;
-
-                    await googleClient.drive.permissions.create({
-                        fileId: document.data.id,
-                        requestBody: {
-                            type: "user",
-                            role: "writer",
-                            emailAddress: ownerEmail,
-                        },
-                    }).catch(err => {
-                        console.error("Error sharing document:", err);
-                    });
-
-
-                    const newWorklog = new Worklog({
-                        link: `https://docs.google.com/document/d/${document.data.id}/edit`,
-                        event: user.events.find(e => e.name === projectName)._id,
-                    });
-                    await newWorklog.save();
-
-                    user.worklogs = user.worklogs || [];
-                    user.worklogs.push(newWorklog._id);
-                    user.activeWorklog = newWorklog._id;
-                    await user.save();
-
-                    // Initialize Table
-                    const requests = [{
-                        insertTable: {
-                            rows: 2,
-                            columns: 5,
-                            location: { index: 1 }
-                        }
-                    }];
+                    }).catch(error => 
+                        Errors.errorMessage({
+                            stack:  error.stack,
+                            content: error.message,
+                            title: "Error creating Google Doc",
+                            interaction: response,
+                            followUp: true
+                        })
+                    );      
                     
+                    // Initialize Table
                     await googleClient.docs.documents.batchUpdate({
                         documentId: document.data.id,
-                        requestBody: { requests }
+                        requestBody: {
+                            requests: [{
+                                insertTable: {
+                                    rows: 2,
+                                    columns: 5,
+                                    location: { index: 1 }
+                                }
+                            }]
+                        }
                     });
 
-                    // Populate Headers
                     const docObj = await googleClient.docs.documents.get({ documentId: document.data.id });
-                    const table = docObj.data.body.content[1].table;
+                    const table = docObj.data.body.content.find(c => c.table)?.table;
                     
+                    //TODO: make this better when I actually know how to code
                     if (table && table.tableRows && table.tableRows.length > 0) {
                         const headerRequests = [];
                         const headers = ["Date", "Team Member", "Task", "Details", "Time"];
                         const firstRow = table.tableRows[0];
-                        for (let i = 0; i < 5; i++) {
+                        // Iterate backwards to avoid index shifting issues
+                        for (let i = 4; i >= 0; i--) {
                             if (firstRow.tableCells[i]) {
                                 headerRequests.push({
                                     insertText: {
                                         text: headers[i],
-                                        location: { index: firstRow.tableCells[i].startIndex } 
+                                        location: { index: firstRow.tableCells[i].startIndex + 1 } 
                                     }
                                 });
                             }
@@ -340,12 +350,63 @@ module.exports = {
                         }
                     }
 
-                    await interaction.editReply({ content: `Created Worklog for **${projectName}**: [Link](${newWorklog.link})` });
+                    await Promise.all(
+                        user.email.map(email => 
+                            googleClient.drive.permissions.create({
+                                fileId: document.data.id,
+                                requestBody: {
+                                    type: "user",
+                                    role: "writer",
+                                    emailAddress: user.email[0],
+                                },
+                            }).catch(async error => {
+                                if(error.message === "Invalid email address.") await response.followUp({
+                                    embeds: [
+                                        new EmbedBuilder()
+                                            .setTitle("Invalid Email Address")
+                                            .setDescription(`The email address **${email}** is invalid. Please update your email in the system or contact an administrator.`)
+                                            .setColor("Red")
+                                    ], ephemeral: true})
+                                else Errors.errorMessage({
+                                    stack:  error.stack,
+                                    content: error.message,
+                                    title: "Error sharing Google Doc",
+                                    interaction: response,
+                                    followUp: true
+                                })
+                            })
+                        )
+                    )
 
-                } catch (e) {
-                    console.error(e);
-                    await interaction.editReply({ content: 'Selection timed out or an error occurred.', components: [] });
-                }
+                    const newWorklog = new Worklog({
+                        link: `https://docs.google.com/document/d/${document.data.id}/edit`,
+                        event: user.events.find(e => e.name === eventName)._id,
+                    });
+
+                    await newWorklog.save();
+
+                    if (!user.worklogs) user.worklogs = [];
+                    user.worklogs.push(newWorklog._id);
+                    user.activeWorklog = newWorklog._id;
+                    await user.save();
+
+                    await response.edit({
+                        embeds: [],
+                        components: [
+                            new ContainerBuilder()
+                                .setAccentColor(0x90ee90)
+                                .addTextDisplayComponents(t => t.setContent(`## Worklog for **${eventName}** Created`))
+                                .addSeparatorComponents(s => s.setDivider(false))
+                                .addSectionComponents(section => section
+                                    .addTextDisplayComponents(t => t.setContent("*Your active worklog has been switched automatically to this new worklog.*"))
+                                    .setButtonAccessory(button => button.setLabel("Worklog Link").setStyle(ButtonStyle.Link).setURL(newWorklog.link))
+                                )
+                        ],
+                        flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
+                    });
+
+                }).catch(async err => Errors.timeOut(interaction, err));
+
                 break;
             }
 
