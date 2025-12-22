@@ -541,17 +541,48 @@ module.exports = {
                           details = modalInteraction.fields.getTextInputValue("detailsInput"),
                           time    = modalInteraction.fields.getTextInputValue("timeInput");
 
-                    const documentId = worklog.link.split("/d/")[1].split("/")[0],
-                          document = await googleClient.docs.documents.get({ documentId }),
-                          table = document.data.body.content.find(c => c.table).table;
+                    const documentId   = worklog.link.split("/d/")[1].split("/")[0],
+                          tableElement = await googleClient.docs.documents.get({ documentId }).then(doc => doc.data.body.content.find(c => c.table)),
+                          table        = tableElement.table;
 
-                    const requests = [];                    const values = [date, members.join(", "), task, details, time + " hrs"];
-                    // Iterate backwards to avoid index shifting issues
+                    let targetRow = null;
+
+                    // Start from the last row and go up
+                    for (let i = table.tableRows.length - 1; i >= 0; i--) {
+                        const row = table.tableRows[i];
+                        
+                        if (row.tableCells[0].content[0].paragraph.elements[0].textRun.content === "\n") targetRow = row;
+                        else break; 
+                        
+                    }
+
+                    if (!targetRow) {
+                        await googleClient.docs.documents.batchUpdate({
+                            documentId,
+                            requestBody: { requests: [{
+                                insertTableRow: {
+                                    tableCellLocation: {
+                                        tableStartLocation: { index: tableElement.startIndex },
+                                        rowIndex: table.tableRows.length - 1
+                                    },
+                                    insertBelow: true
+                                }
+                            }]}
+                        });
+                        
+                        // Re-fetch to get new indices safely
+                        const updatedTable = await googleClient.docs.documents.get({ documentId }).then(doc => doc.data.body.content.find(c => c.table).table);
+                        targetRow = updatedTable.tableRows[updatedTable.tableRows.length - 1];
+                    }
+
+                    const requests = [];
+                    const values = [date, members.join(", "), task, details, time + " hrs"];
+                    
                     for (let i = 4; i >= 0; i--) {
                         requests.push({
                             insertText: {
                                 text: values[i],
-                                location: { index: table.tableRows[table.tableRows.length - 1].tableCells[i].startIndex + 1 } 
+                                location: { index: targetRow.tableCells[i].startIndex + 1 } 
                             }
                         });    
                     }
@@ -565,7 +596,7 @@ module.exports = {
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Worklog Entry Added")
-                                .setDescription(`Your worklog entry for **${worklog.event.name}** has been added successfully. It is the ${table.tableRows.length}th entry in the document.`)
+                                .setDescription(`Your worklog entry for **${worklog.event.name}** has been added successfully.`)
                                 .setColor("Green")
                                 .addFields(
                                     { name: "Date", value: date, inline: true },
