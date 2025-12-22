@@ -471,12 +471,12 @@ module.exports = {
                         .addLabelComponents(
                             new LabelBuilder()
                                 .setLabel("Date")
-                                .setDescription("The date of the work (DD/MM/YYYY)")
+                                .setDescription("The date of the work (MM/DD/YYYY)")
                                 .setTextInputComponent( 
                                     new TextInputBuilder()
                                         .setCustomId('dateInput')
-                                        //current date in DD/MM/YYYY
-                                        .setValue(new Date().toLocaleDateString('en-GB'))
+                                        //current date in MM/DD/YYYY
+                                        .setValue(new Date().toLocaleDateString('en-US'))
                                         .setStyle(TextInputStyle.Short)
                                         .setRequired(true)
                                 ),
@@ -540,6 +540,20 @@ module.exports = {
                           task    = modalInteraction.fields.getTextInputValue("taskInput"),
                           details = modalInteraction.fields.getTextInputValue("detailsInput"),
                           time    = modalInteraction.fields.getTextInputValue("timeInput");
+
+                    if(isNaN(Date.parse(date))) return await modalInteraction.reply({ embeds: [
+                        new EmbedBuilder()
+                            .setTitle("Invalid Date")
+                            .setDescription("The date you entered is invalid. Please use the format MM/DD/YYYY.")
+                            .setColor("Red")
+                    ], ephemeral: true });
+
+                    if(isNaN(parseFloat(time)) || parseFloat(time) <= 0) return await modalInteraction.reply({ embeds: [
+                        new EmbedBuilder()
+                            .setTitle("Invalid Time")
+                            .setDescription("The time you entered is invalid. Please enter a positive number.")
+                            .setColor("Red")
+                    ], ephemeral: true });
 
                     const documentId   = worklog.link.split("/d/")[1].split("/")[0],
                           tableElement = await googleClient.docs.documents.get({ documentId }).then(doc => doc.data.body.content.find(c => c.table)),
