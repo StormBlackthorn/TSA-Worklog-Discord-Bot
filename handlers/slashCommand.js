@@ -16,45 +16,48 @@ const rest = new REST().setToken(TOKEN);
 module.exports = (client) => {
 	const slashCommands = []; 
 
-	fs.readdirSync('./slashCommands/').forEach(async dir => {
+	const dirs = fs.readdirSync('./slashCommands/');
+	
+	for (const dir of dirs) {
 		const files = fs.readdirSync(`./slashCommands/${dir}/`).filter(file => file.endsWith('.js'));
 
 		for(const file of files) {
-				const slashCommand = require(`../slashCommands/${dir}/${file}`);
-				slashCommands.push({
-					name: slashCommand.name,
-					description: slashCommand.description,
-					type: slashCommand.type,
-					options: slashCommand.options ? slashCommand.options : null,
-					default_permission: slashCommand.default_permission ? slashCommand.default_permission : null,
-					default_member_permissions: slashCommand.default_member_permissions ? PermissionsBitField.resolve(slashCommand.default_member_permissions).toString() : null,
-					integration_types: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall],
-					contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
-				});
+			const slashCommand = require(`../slashCommands/${dir}/${file}`);
 			
-				if(slashCommand.name) {
-						client.slashCommands.set(slashCommand.name, slashCommand)
-						table.addRow(file.split('.js')[0], 'OK')
-				} else {
-						table.addRow(file.split('.js')[0], 'ERROR')
-				}
+			slashCommands.push({
+				name: slashCommand.name,
+				description: slashCommand.description,
+				type: slashCommand.type,
+				options: slashCommand.options ?? null,
+				default_permission: slashCommand.default_permission ?? null,
+				default_member_permissions: slashCommand.default_member_permissions ? PermissionsBitField.resolve(slashCommand.default_member_permissions).toString() : null,
+				integration_types: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall],
+				contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
+			});
+		
+			if(slashCommand.name) {
+					client.slashCommands.set(slashCommand.name, slashCommand)
+					table.addRow(file.split('.js')[0], 'OK')
+			} else {
+					table.addRow(file.split('.js')[0], 'ERROR')
+			}
 		}
 		
-	});
+	}
 	
 	console.log(chalk.red(table.toString()));
 
 	(async () => {
-			try {
-				await rest.put(
-					process.env.GUILD_ID ?
-					Routes.applicationGuildCommands(CLIENT_ID, process.env.GUILD_ID) :
-					Routes.applicationCommands(CLIENT_ID), 
-					{ body: slashCommands }
-				);
-				console.log(chalk.yellow('Slash Commands • Registered'))
-			} catch (error) {
-				console.log(error);
-			}
+		try {
+			await rest.put(
+				process.env.GUILD_ID ?
+				Routes.applicationGuildCommands(CLIENT_ID, process.env.GUILD_ID) :
+				Routes.applicationCommands(CLIENT_ID), 
+				{ body: slashCommands }
+			);
+			console.log(chalk.yellow('Slash Commands • Registered'))
+		} catch (error) {
+			console.log(error);
+		}
 	})();
 };

@@ -67,20 +67,26 @@ module.exports = {
         description: "Export your worklog as a PDF",
         type: ApplicationCommandOptionType.Subcommand,
     }, {
-        name: "list",
-        description: "List all your worklogs",
-        type: ApplicationCommandOptionType.Subcommand,
-    }, {
-        name: "switch",
-        description: "Switch to a different worklog",
-        type: ApplicationCommandOptionType.Subcommand,
+        name: "worklogs",
+        description: "Manage your worklogs",
+        type: ApplicationCommandOptionType.SubcommandGroup,
         options: [{
-            name: "worklog",
-            description: "The worklog to switch to",
-            type: ApplicationCommandOptionType.String,
-            autocomplete: true,
-            required: true
-        }],
+            name: "list",
+            description: "List all your worklogs",
+            type: ApplicationCommandOptionType.Subcommand,
+        }, {
+            name: "switch",
+            description: "Switch to a different worklog",
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [{
+                name: "worklog",
+                description: "The worklog to switch to",
+                type: ApplicationCommandOptionType.String,
+                autocomplete: true,
+                required: true
+            }],
+        }]
+
     }],
 
     async autoComplete(interaction) {
@@ -146,9 +152,7 @@ module.exports = {
                 
                 user = await user.populate("worklogs").then((index) => index.populate({
                     path: "worklogs",
-                    populate: {
-                        path: "event"
-                    }
+                    populate: { path: "event" }
                 }));
 
                 if (!user.worklogs || user.worklogs.length === 0) return interaction.reply({embeds: [
@@ -276,7 +280,7 @@ module.exports = {
                                     new StringSelectMenuBuilder()
                                     .setCustomId('eventSelection')
                                     .setPlaceholder('Select an event')
-                                    .addOptions(
+                                    .setOptions(
                                         availableEvents.map(event => 
                                             new StringSelectMenuOptionBuilder()
                                                 .setLabel(event.name)
@@ -322,7 +326,7 @@ module.exports = {
                         requestBody: {
                             requests: [{
                                 insertTable: {
-                                    rows: 2,
+                                    rows: 1,
                                     columns: 5,
                                     location: { index: 1 }
                                 }
@@ -331,32 +335,25 @@ module.exports = {
                     });
 
                     const docObj = await googleClient.docs.documents.get({ documentId: document.data.id });
-                    const table = docObj.data.body.content.find(c => c.table)?.table;
+                    const table = docObj.data.body.content.find(c => c.table).table;
                     
-                    //TODO: make this better when I actually know how to code
-                    if (table && table.tableRows && table.tableRows.length > 0) {
-                        const headerRequests = [];
-                        const headers = ["Date", "Team Member", "Task", "Details", "Time"];
-                        const firstRow = table.tableRows[0];
-                        // Iterate backwards to avoid index shifting issues
-                        for (let i = 4; i >= 0; i--) {
-                            if (firstRow.tableCells[i]) {
-                                headerRequests.push({
-                                    insertText: {
-                                        text: headers[i],
-                                        location: { index: firstRow.tableCells[i].startIndex + 1 } 
-                                    }
-                                });
+                    const headerRequests = [];
+                    const headers = ["Date", "Team Member", "Task", "Details", "Time"];
+                    // Iterate backwards to avoid index shifting issues
+                    for (let i = 4; i >= 0; i--) {
+                        headerRequests.push({
+                            insertText: {
+                                text: headers[i],
+                                location: { index: table.tableRows[0].tableCells[i].startIndex + 1 } 
                             }
-                        }
-                        if (headerRequests.length > 0) {
-                            await googleClient.docs.documents.batchUpdate({
-                                documentId: document.data.id,
-                                requestBody: { requests: headerRequests }
-                            });
-                        }
+                        });    
                     }
-
+                    
+                    await googleClient.docs.documents.batchUpdate({
+                        documentId: document.data.id,
+                        requestBody: { requests: headerRequests }
+                    });
+                        
                     const currentEvent = user.events.find(e => e.name === eventName);
                     
                     const newWorklog = new Worklog({
@@ -450,181 +447,138 @@ module.exports = {
             }
 
             case "add": {
-                const user = await User.findOne({ discordId: interaction.user.id }).then((index) => index.populate("activeWorklog"));
-                if (!user) return await interaction.reply({ content: "You are not registered.", ephemeral: true });
-                if (!user.activeWorklog) return await interaction.reply({ content: "You do not have an active worklog selected.", ephemeral: true });
-
-                const eventName = user.activeWorklog.event.name;
-                const eventGroups = eventsData[eventName];
-                
-                let teamMembers = [user.name]; // Default to user if not found
-                if (eventGroups) {
-                    for (const group of eventGroups) {
-                        if (group.includes(user.name)) {
-                            teamMembers = group;
-                            break;
-                        }
+                await user.populate({
+                    path: "activeWorklog",
+                    populate: {
+                        path: "event",
+                        populate: { path: "members" }
                     }
-                }
-
-                const selectMenu = new StringSelectMenuBuilder()
-                    .setCustomId('add_member_select')
-                    .setPlaceholder('Select team members')
-                    .setMinValues(1)
-                    .setMaxValues(teamMembers.length)
-                    .addOptions(
-                        teamMembers.map(member => 
-                            new StringSelectMenuOptionBuilder()
-                                .setLabel(member)
-                                .setValue(member)
-                                .setDefault(member === user.name)
-                        )
-                    );
-
-                const row = new ActionRowBuilder().addComponents(selectMenu);
-
-                const response = await interaction.reply({
-                    content: 'Select team members for this entry:',
-                    components: [row],
-                    ephemeral: true
                 });
+                
+                const worklog = user.activeWorklog;
 
-                try {
-                    const confirmation = await response.awaitMessageComponent({ filter: i => i.user.id === interaction.user.id, time: 60000, componentType: ComponentType.StringSelect });
-                    
-                    const selectedMembers = confirmation.values;
+                if(!worklog) return await interaction.reply({ embeds: [
+                    new EmbedBuilder()
+                        .setTitle("No Active Worklog")
+                        .setDescription("You have no active worklog. Please create one using `/worklog create` or switch to an existing one using `/worklog worklogs switch`.")
+                        .setColor("Red")
+                ], ephemeral: true });
 
-                    const modal = new ModalBuilder()
-                        .setCustomId('worklog_add_modal')
-                        .setTitle('Add Worklog Entry');
+                await interaction.showModal(
+                    new ModalBuilder()
+                        .setCustomId('addWorklogEntryModal')
+                        .setTitle(`Add Worklog Entry for ${worklog.name}`)
+                        .addLabelComponents(
+                            new LabelBuilder()
+                                .setLabel("Date")
+                                .setDescription("The date of the work (DD/MM/YYYY)")
+                                .setTextInputComponent( 
+                                    new TextInputBuilder()
+                                        .setCustomId('dateInput')
+                                        //current date in DD/MM/YYYY
+                                        .setValue(new Date().toLocaleDateString('en-GB'))
+                                        .setStyle(TextInputStyle.Short)
+                                        .setRequired(true)
+                                ),
+                            new LabelBuilder()
+                                .setLabel("Members")
+                                .setDescription("The members that worked on this task")
+                                .setStringSelectMenuComponent(
+                                    new StringSelectMenuBuilder()
+                                        .setCustomId('membersSelection')
+                                        .setPlaceholder('Select team members')
+                                        .setRequired(true)
+                                        .setMinValues(1)
+                                        .setMaxValues(worklog.event.members.length)
+                                        .setOptions(
+                                            worklog.event.members.map(member => 
+                                                new StringSelectMenuOptionBuilder()
+                                                    .setLabel(member.name)
+                                                    .setValue(member.name)
+                                                    .setDefault(member._id.toString() === user._id.toString())
+                                            )
+                                        )
+                                ),
+                            new LabelBuilder()
+                                .setLabel("Task")
+                                .setDescription("The task that was worked on")
+                                .setTextInputComponent( 
+                                    new TextInputBuilder()
+                                        .setCustomId('taskInput')
+                                        .setPlaceholder("...I finished the pizza...")
+                                        .setStyle(TextInputStyle.Short)
+                                        .setRequired(true)
+                                ),
+                            new LabelBuilder()
+                                .setLabel("Details")
+                                .setDescription("Details about the work done")
+                                .setTextInputComponent(
+                                    new TextInputBuilder()
+                                        .setCustomId('detailsInput')
+                                        .setPlaceholder("...It was a cheese pizza, very delicious indeed...")
+                                        .setStyle(TextInputStyle.Paragraph)
+                                        .setRequired(true)
+                                ),
+                            new LabelBuilder()
+                                .setLabel("Time")
+                                .setDescription("Time spent on the task (in hours)")
+                                .setTextInputComponent( 
+                                    new TextInputBuilder()
+                                        .setCustomId('timeInput')
+                                        .setPlaceholder("67")
+                                        .setStyle(TextInputStyle.Short)
+                                        .setRequired(true)
+                                )
+                        )
+                )
 
-                    const taskInput = new TextInputBuilder()
-                        .setCustomId('task')
-                        .setLabel("Task")
-                        .setStyle(TextInputStyle.Short)
-                        .setRequired(true);
+                interaction.awaitModalSubmit({
+                    time: 240_000,
+                }).then(async modalInteraction => {
+                    const date    = modalInteraction.fields.getTextInputValue("dateInput"),
+                          members = modalInteraction.fields.getStringSelectValues("membersSelection"),
+                          task    = modalInteraction.fields.getTextInputValue("taskInput"),
+                          details = modalInteraction.fields.getTextInputValue("detailsInput"),
+                          time    = modalInteraction.fields.getTextInputValue("timeInput");
 
-                    const detailsInput = new TextInputBuilder()
-                        .setCustomId('details')
-                        .setLabel("Details")
-                        .setStyle(TextInputStyle.Paragraph)
-                        .setRequired(true);
+                    const documentId = worklog.link.split("/d/")[1].split("/")[0],
+                          document = await googleClient.docs.documents.get({ documentId }),
+                          table = document.data.body.content.find(c => c.table).table;
 
-                    const timeInput = new TextInputBuilder()
-                        .setCustomId('time')
-                        .setLabel("Time (minutes)")
-                        .setStyle(TextInputStyle.Short) // Number not supported in TextInput, parse later
-                        .setRequired(true);
-
-                    modal.addComponents(
-                        new ActionRowBuilder().addComponents(taskInput),
-                        new ActionRowBuilder().addComponents(detailsInput),
-                        new ActionRowBuilder().addComponents(timeInput)
-                    );
-
-                    await confirmation.showModal(modal);
-
-                    const modalSubmit = await confirmation.awaitModalSubmit({ time: 300000 });
-                    
-                    await modalSubmit.deferReply({ ephemeral: true });
-
-                    const task = modalSubmit.fields.getTextInputValue('task');
-                    const details = modalSubmit.fields.getTextInputValue('details');
-                    const time = modalSubmit.fields.getTextInputValue('time');
-                    const date = new Date().toLocaleDateString("en-GB"); // DD/MM/YYYY
-
-                    // Update Google Doc
-                    const docId = user.activeWorklog.link.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
-                    
-                    // We need to append a row to the table.
-                    // First, get the table.
-                    const docObj = await googleClient.docs.documents.get({ documentId: docId });
-                    const content = docObj.data.body.content;
-                    let tableIndex = -1;
-                    
-                    // Find the first table
-                    for (let i = 0; i < content.length; i++) {
-                        if (content[i].table) {
-                            tableIndex = i;
-                            break;
-                        }
+                    const requests = [];                    const values = [date, members.join(", "), task, details, time + " hrs"];
+                    // Iterate backwards to avoid index shifting issues
+                    for (let i = 4; i >= 0; i--) {
+                        requests.push({
+                            insertText: {
+                                text: values[i],
+                                location: { index: table.tableRows[table.tableRows.length - 1].tableCells[i].startIndex + 1 } 
+                            }
+                        });    
                     }
-
-                    if (tableIndex === -1) {
-                        // No table found, create one? Or error?
-                        // Let's assume init created it. If not, we can't easily append without creating one.
-                        await modalSubmit.editReply("Could not find the worklog table in the document.");
-                        return;
-                    }
-
-                    // To append a row, we can use insertTableRow at the end of the table.
-                    // But insertTableRow just adds an empty row. We then need to fill it.
-                    // Or we can just insert text into the last row if it's empty? No, always new row.
-                    
-                    // We need the index of the table start to use insertTableRow?
-                    // No, insertTableRow takes a TableCellLocation or index.
-                    // "The location to insert the new row. The index is 0-based relative to the start of the table."
-                    
-                    // Wait, the API for insertTableRow:
-                    // { tableCellLocation: { tableStartLocation: { index: ... }, rowIndex: ... }, insertBelow: true }
-                    
-                    const tableStartLocationIndex = content[tableIndex].startIndex;
-                    const lastRowIndex = content[tableIndex].table.rows - 1; // This property might not exist on the object directly like this.
-                    // content[tableIndex].table.tableRows.length
-                    const rowCount = content[tableIndex].table.tableRows.length;
-
-                    const requests = [{
-                        insertTableRow: {
-                            tableCellLocation: {
-                                tableStartLocation: { index: tableStartLocationIndex },
-                                rowIndex: rowCount - 1
-                            },
-                            insertBelow: true
-                        }
-                    }];
 
                     await googleClient.docs.documents.batchUpdate({
-                        documentId: docId,
+                        documentId,
                         requestBody: { requests }
                     });
 
-                    // Now we need to fill the new row.
-                    // We need to fetch the doc AGAIN to get the indices of the new row cells.
-                    const updatedDocObj = await googleClient.docs.documents.get({ documentId: docId });
-                    const updatedTable = updatedDocObj.data.body.content[tableIndex].table;
-                    const newRow = updatedTable.tableRows[rowCount]; // The one we just added (index = old length)
+                    await modalInteraction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("Worklog Entry Added")
+                                .setDescription(`Your worklog entry for **${worklog.event.name}** has been added successfully. It is the ${table.tableRows.length}th entry in the document.`)
+                                .setColor("Green")
+                                .addFields(
+                                    { name: "Date", value: date, inline: true },
+                                    { name: "Members", value: members.join(", "), inline: true },
+                                    { name: "Time", value: time + " hrs", inline: true },
+                                    { name: "Task", value: task, inline: true },
+                                    { name: "Details", value: details, inline: true },
+                                ),
+                        ],
+                        ephemeral: true
+                    })
 
-                    const fillRequests = [];
-                    const rowValues = [date, selectedMembers.join(", "), task, details, time];
-
-                    for (let i = 0; i < 5; i++) {
-                        if (newRow.tableCells[i]) {
-                            fillRequests.push({
-                                insertText: {
-                                    text: rowValues[i],
-                                    location: { index: newRow.tableCells[i].startIndex }
-                                }
-                            });
-                        }
-                    }
-
-                    if (fillRequests.length > 0) {
-                        await googleClient.docs.documents.batchUpdate({
-                            documentId: docId,
-                            requestBody: { requests: fillRequests }
-                        });
-                    }
-
-                    await modalSubmit.editReply("Successfully added entry to worklog.");
-
-                } catch (e) {
-                    console.error(e);
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.editReply({ content: 'Timed out or error occurred.', components: [] });
-                    } else {
-                        // interaction.followUp({ content: 'Error occurred.' });
-                    }
-                }
+                }).catch(async err => Errors.timeOut(interaction, err));
 
                 break;
             }
