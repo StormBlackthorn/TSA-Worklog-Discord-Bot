@@ -86,7 +86,7 @@ module.exports = {
     async autoComplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
 
-        let user = await (await User.findOne({ discordId: interaction.user.id })).populate("worklogs");
+        let user = await User.findOne({ discordId: interaction.user.id }).then((index) => index.populate("worklogs"));
 
         if(!user) return await interaction.respond([{
             name: "You are not registered",
@@ -131,6 +131,7 @@ module.exports = {
 
  
     },
+    
     async run(client, interaction) {
 
         const subcommand = interaction.options.getSubcommand();
@@ -143,13 +144,12 @@ module.exports = {
 
             case "list": {
                 
-                user = await user.populate("worklogs");
-                user = await user.populate({
+                user = await user.populate("worklogs").then((index) => index.populate({
                     path: "worklogs",
                     populate: {
                         path: "event"
                     }
-                });
+                }));
 
                 if (!user.worklogs || user.worklogs.length === 0) return interaction.reply({embeds: [
                     new EmbedBuilder()
@@ -226,7 +226,7 @@ module.exports = {
                 user.activeWorklog = worklogId;
                 await user.save();
 
-                const worklog = await (await Worklog.findById(worklogId)).populate("event");
+                const worklog = await Worklog.findById(worklogId).then((index) => index.populate("event"));
 
                 return await interaction.reply({ components: [
                     new ContainerBuilder()
@@ -246,9 +246,15 @@ module.exports = {
             
             case "create": {
 
-                user = await (await user.populate("events")).populate("worklogs");
+                user = await user.populate("events").then((index) => index.populate({
+                    path: "events",
+                    populate: {
+                        path: "members"
+                    }
+                })).then((index) => index.populate("worklogs"));
+
                 //I dont even know what I'm writing anymore man
-                const availableEvents = (user.events?.filter(event => !user.worklogs.some(worklog => worklog.event._id.toString() === event._id.toString()))) || [];
+                const availableEvents = (user.events?.filter(event => !user.worklogs?.some(worklog => worklog.event._id.toString() === event._id.toString()))) || [];
 
                 if (availableEvents.length === 0) return await interaction.reply({ 
                     embeds: [
@@ -285,13 +291,14 @@ module.exports = {
                     time: 120_000,
                 }).then(async modalInteraction => {
                     const eventName = modalInteraction.fields.getStringSelectValues("eventSelection")[0];
-                    const response = await modalInteraction.reply({
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle("Creating Worklog")
-                                .setDescription(`Creating worklog for **${eventName}**...`)
-                                .setColor("Green")
-                        ], ephemeral: true })
+
+                    const container = new ContainerBuilder()
+                        .setAccentColor(0x90ee90)
+                        .addTextDisplayComponents(t => t.setContent(`## Creating Worklog for **${eventName}**...`))
+                        .addSeparatorComponents(s => s.setDivider(false))
+                        .addTextDisplayComponents(t => t.setContent("*Please wait while we create your worklog...*"))
+
+                    const response = await modalInteraction.reply({ components: [container], flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2], withResponse: true });
 
                     const document = await googleClient.drive.files.create({
                         resource: {
@@ -350,17 +357,60 @@ module.exports = {
                         }
                     }
 
+                    const currentEvent = user.events.find(e => e.name === eventName);
+                    
+                    const newWorklog = new Worklog({
+                        link: `https://docs.google.com/document/d/${document.data.id}/edit`,
+                        event: currentEvent._id,
+                    });
+                    await newWorklog.save();
+
+                    let teammates = {};
+                    currentEvent.members.forEach(member => teammates[member.name] = member.email);
+
+                    let logContent = "";
+                    async function updateMessageContent(content, clear=false) {
+
+                        if(clear) logContent = content;
+                        else logContent += content;
+
+                        const componentText = new ContainerBuilder(
+                            response.resource.message.components[0].toJSON()
+                        );
+
+                        componentText.components[2].setContent(logContent);
+
+                        return await modalInteraction.editReply({
+                            components: [ componentText ]
+                        });
+                    }
+
+                    await updateMessageContent("*Sharing document with teammates...*", true);
+                    
+
                     await Promise.all(
-                        user.email.map(email => 
-                            googleClient.drive.permissions.create({
+ 
+                        [...new Set([...user.email, ...Object.values(teammates).flat()])].filter(email => email).map(email => {
+                            return googleClient.drive.permissions.create({
                                 fileId: document.data.id,
                                 requestBody: {
                                     type: "user",
                                     role: "writer",
-                                    emailAddress: user.email[0],
+                                    emailAddress: email,
                                 },
-                            }).catch(async error => {
-                                if(error.message === "Invalid email address.") await response.followUp({
+                            }).then(async () => {
+                                let member = currentEvent.members.find(m => m.email.includes(email));
+                                if(!member.worklogs) member.worklogs = [];
+
+                                member.worklogs.push(newWorklog._id);
+                                //setting self's active worklog 
+                                if(member._id.toString() === user._id.toString()) member.activeWorklog = newWorklog._id;
+
+                                return await member.save();
+                            }).then(async () => 
+                                updateMessageContent(`\n> Shared with **${email}** [${user.email.includes(email) ? "You" : Object.keys(teammates).find(key => teammates[key].includes(email))}]`)
+                            ).catch(async error => {
+                                if(error.message.includes("The specified emailAddress is invalid")) await modalInteraction.followUp({
                                     embeds: [
                                         new EmbedBuilder()
                                             .setTitle("Invalid Email Address")
@@ -370,27 +420,15 @@ module.exports = {
                                 else Errors.errorMessage({
                                     stack:  error.stack,
                                     content: error.message,
-                                    title: "Error sharing Google Doc",
-                                    interaction: response,
+                                    title: `Error sharing Google Doc to ${email}`,
+                                    interaction: modalInteraction,
                                     followUp: true
                                 })
                             })
-                        )
+                        })
                     )
 
-                    const newWorklog = new Worklog({
-                        link: `https://docs.google.com/document/d/${document.data.id}/edit`,
-                        event: user.events.find(e => e.name === eventName)._id,
-                    });
-
-                    await newWorklog.save();
-
-                    if (!user.worklogs) user.worklogs = [];
-                    user.worklogs.push(newWorklog._id);
-                    user.activeWorklog = newWorklog._id;
-                    await user.save();
-
-                    await response.edit({
+                    await modalInteraction.editReply({
                         embeds: [],
                         components: [
                             new ContainerBuilder()
@@ -401,17 +439,18 @@ module.exports = {
                                     .addTextDisplayComponents(t => t.setContent("*Your active worklog has been switched automatically to this new worklog.*"))
                                     .setButtonAccessory(button => button.setLabel("Worklog Link").setStyle(ButtonStyle.Link).setURL(newWorklog.link))
                                 )
+                                .addTextDisplayComponents(t => t.setContent(logContent.replaceAll("*Sharing document with teammates...*", "*Worklog document shared with the following emails:*")))
                         ],
                         flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral],
                     });
 
-                }).catch(async err => Errors.timeOut(interaction, err));
+                 }).catch(async err => Errors.timeOut(interaction, err));
 
                 break;
             }
 
             case "add": {
-                const user = await (await User.findOne({ discordId: interaction.user.id })).populate("activeWorklog");
+                const user = await User.findOne({ discordId: interaction.user.id }).then((index) => index.populate("activeWorklog"));
                 if (!user) return await interaction.reply({ content: "You are not registered.", ephemeral: true });
                 if (!user.activeWorklog) return await interaction.reply({ content: "You do not have an active worklog selected.", ephemeral: true });
 
