@@ -72,6 +72,16 @@ module.exports = {
                             .setTitle("Invalid member")
                             .setDescription(`**${name}** is not a member of North Creek TSA.`)
                             .setColor("Red")
+                            .setAuthor({
+                                name: client.user.username,
+                                iconURL: client.user.displayAvatarURL(),
+                                url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                            })
+                            .setFooter({
+                                text: interaction.user.username,
+                                iconURL: interaction.user.displayAvatarURL()
+                            })
+                            .setTimestamp()
                     ],
                     ephemeral: true
                 });
@@ -118,6 +128,16 @@ module.exports = {
                             .setTitle("Invalid event")
                             .setDescription(`**${eventName}** is not a valid event.`)
                             .setColor("Red")
+                            .setAuthor({
+                                name: client.user.username,
+                                iconURL: client.user.displayAvatarURL(),
+                                url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                            })
+                            .setFooter({
+                                text: interaction.user.username,
+                                iconURL: interaction.user.displayAvatarURL()
+                            })
+                            .setTimestamp()                            
                     ],
                     ephemeral: true
                 });

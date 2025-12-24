@@ -128,7 +128,28 @@ module.exports = {
                 .setTitle(title)
                 .setColor('Red')
                 .setDescription(`The developer(me)(@chthollygirl) has been notified. Feel free to send me a DM as well. \n***${content}***\n\n\`\`\`sh\n${stack.length > 2000 ? stack.slice(0, 2000) + '\n... [TRUNCATED, LOGGED IN CONSOLE]' : stack}\`\`\` `)
+                .setAuthor({
+                    name: client.user.username,
+                    iconURL: client.user.displayAvatarURL(),
+                    url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                })
+                .setFooter({
+                    text: interaction.user.username,
+                    iconURL: interaction.user.displayAvatarURL()
+                })
                 .setTimestamp()
+
+            if (interaction) {
+                embed.setAuthor({
+                    name: interaction.client.user.username,
+                    iconURL: interaction.client.user.displayAvatarURL(),
+                    url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                })
+                .setFooter({
+                    text: interaction.user.username,
+                    iconURL: interaction.user.displayAvatarURL()
+                });
+            }
 
             await webHook.send({
                 content: `<@1409557350729257090>`,
@@ -166,6 +187,16 @@ module.exports = {
                         .setTitle("Interaction Timed Out")
                         .setDescription("You did not respond in time. Please use the command again.")
                         .setColor("Red")
+                        .setAuthor({
+                            name: interaction.client.user.username,
+                            iconURL: interaction.client.user.displayAvatarURL(),
+                            url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                        })
+                        .setFooter({
+                            text: interaction.user.username,
+                            iconURL: interaction.user.displayAvatarURL()
+                        })
+                        .setTimestamp()
                 ],
                 ephemeral: true
             })
@@ -223,10 +254,20 @@ module.exports = {
         /**
          * Returns an embed that has the "You are not registered" message
          */
-        notRegisteredEmbed: new EmbedBuilder()
+        notRegisteredEmbed: (client, interaction) => new EmbedBuilder()
             .setTitle("Not Registered")
             .setDescription("You are not registered. Please register using `/user register` to use this command.")
-            .setColor("Red"),
+            .setColor("Red")
+            .setAuthor({
+                name: client.user.username,
+                iconURL: client.user.displayAvatarURL(),
+                url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+            })
+            .setFooter({
+                text: interaction.user.username,
+                iconURL: interaction.user.displayAvatarURL()
+            })
+            .setTimestamp(),
         
         
     },

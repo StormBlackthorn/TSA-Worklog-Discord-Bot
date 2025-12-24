@@ -48,7 +48,7 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         let user = await User.findOne({ discordId: interaction.user.id });
-        if(subcommand !== "register" && !user) return await interaction.reply({ embeds: [Message.notRegisteredEmbed], ephemeral: true });
+        if(subcommand !== "register" && !user) return await interaction.reply({ embeds: [Message.notRegisteredEmbed(client, interaction)], ephemeral: true });
         
         switch(subcommand) {
             case "register":
@@ -60,6 +60,16 @@ module.exports = {
                                 .setTitle("Profile Already Registered")
                                 .setDescription("You have already registered your user profile.")
                                 .setColor("Red")
+                                .setAuthor({
+                                    name: client.user.username,
+                                    iconURL: client.user.displayAvatarURL(),
+                                    url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                })
+                                .setFooter({
+                                    text: interaction.user.username,
+                                    iconURL: interaction.user.displayAvatarURL()
+                                })
+                                .setTimestamp()                                
                     ], ephemeral: true });
                 }
 
@@ -94,6 +104,16 @@ module.exports = {
                                     .setTitle("Name Not Found")
                                     .setDescription(`We could not find a valid TSA member named \`${fullName}\` in our database. Please ensure you entered your name exactly as you did when signing up for TSA.\nContact @Chthollygirl if you believe that this is a mistake.`)
                                     .setColor("Red")
+                                    .setAuthor({
+                                        name: client.user.username,
+                                        iconURL: client.user.displayAvatarURL(),
+                                        url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                    })
+                                    .setFooter({
+                                        text: interaction.user.username,
+                                        iconURL: interaction.user.displayAvatarURL()
+                                    })
+                                    .setTimestamp()
                             ],
                             ephemeral: true
                         })
@@ -104,6 +124,16 @@ module.exports = {
                                 .setTitle("Profile Already Registered")
                                 .setDescription(`The TSA member profile for \`${fullName}\` has already been registered with the Discord account <@${user.discordId}>.`)
                                 .setColor("Red")
+                                .setAuthor({
+                                    name: client.user.username,
+                                    iconURL: client.user.displayAvatarURL(),
+                                    url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                })
+                                .setFooter({
+                                    text: interaction.user.username,
+                                    iconURL: interaction.user.displayAvatarURL()
+                                })
+                                .setTimestamp()
                         ],
                         ephemeral: true
                     })
@@ -114,6 +144,16 @@ module.exports = {
                                 .setTitle("Is this you?")
                                 .setDescription(`We found a TSA member with the name ***${user.name}***.\n**Grade:** ${user.grade}\n**School Email:** ${user.email[0]}\n**Events:** *${user.events?.map(e => e.name).join(", ") ?? "None"}*`)
                                 .setColor("Grey")
+                                .setAuthor({
+                                    name: client.user.username,
+                                    iconURL: client.user.displayAvatarURL(),
+                                    url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                })
+                                .setFooter({
+                                    text: interaction.user.username,
+                                    iconURL: interaction.user.displayAvatarURL()
+                                })
+                                .setTimestamp()
                         ],
                         components: [
                             new ActionRowBuilder().addComponents(
@@ -145,6 +185,16 @@ module.exports = {
                                             .setTitle("Profile Registered")
                                             .setDescription("Your user profile has been successfully registered!\nUse `/user view` to view your profile.")
                                             .setColor("Green")
+                                            .setAuthor({
+                                                name: client.user.username,
+                                                iconURL: client.user.displayAvatarURL(),
+                                                url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                            })
+                                            .setFooter({
+                                                text: interaction.user.username,
+                                                iconURL: interaction.user.displayAvatarURL()
+                                            })
+                                            .setTimestamp()
                                     ],
                                     components: []
                                 });
@@ -164,6 +214,16 @@ module.exports = {
                                             .setTitle("Worklogs Found")
                                             .setDescription("We found existing worklogs associated with your profile for the following events:\n- **" + user.events.map(n => n.name).join("**\n- **")+"**\nYou can view them using the `/worklog worklogs list` command.")
                                             .setColor("Green")
+                                            .setAuthor({
+                                                name: client.user.username,
+                                                iconURL: client.user.displayAvatarURL(),
+                                                url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                            })
+                                            .setFooter({
+                                                text: interaction.user.username,
+                                                iconURL: interaction.user.displayAvatarURL()
+                                            })
+                                            .setTimestamp()
                                     ]
                                 })
 
@@ -174,6 +234,16 @@ module.exports = {
                                             .setTitle("Registration Cancelled")
                                             .setDescription("Profile registration has been cancelled. Please ensure you enter your name exactly as you did when signing up for TSA.\nYou may run the `/user register` command again to reattempt profile registration.")
                                             .setColor("Red")
+                                            .setAuthor({
+                                                name: client.user.username,
+                                                iconURL: client.user.displayAvatarURL(),
+                                                url: "https://github.com/StormBlackthorn/TSA-Worklog-Discord-Bot"
+                                            })
+                                            .setFooter({
+                                                text: interaction.user.username,
+                                                iconURL: interaction.user.displayAvatarURL()
+                                            })
+                                            .setTimestamp()
                                     ],
                                     components: []
                                 });
