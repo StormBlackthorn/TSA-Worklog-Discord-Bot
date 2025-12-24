@@ -5,10 +5,9 @@ const {
 module.exports = {
 	name: 'ping',
 	description: "Check bot's ping.",
-	category: "info",
 	type: ApplicationCommandType.ChatInput,
 	async run(client, interaction) {
-		await interaction.reply(`🏓 Pong! Latency: **${Math.round(client.ws.ping)} ms**`)
+		await interaction.reply({ content: `🏓 Pong! Latency: **${Math.round(client.ws.ping)} ms**`, ephemeral: true })
 	}
 };
 
