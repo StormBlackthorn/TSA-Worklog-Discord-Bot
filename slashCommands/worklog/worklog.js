@@ -4,22 +4,20 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    ActionRowBuilder,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
-    ComponentType,
     EmbedBuilder,
     ContainerBuilder,
     MessageFlags,
     ButtonStyle,
     LabelBuilder,
+    AttachmentBuilder,
+    FileBuilder,
 } = require("discord.js");
 const { googleClient } = require("../../index.js");
 
 const User = require("../../utils/models/user.js")();
 const Worklog = require("../../utils/models/worklog.js")();
-const eventsData = require("../../utils/config/events.json");
-const worklog = require("../../utils/models/worklog.js");
 const { Message, Errors } = require("../../utils/utils.js");
 
 const folderID = "1Kj7zdg_ccnVvT9F7epl5bYN1kK8GMy47";
@@ -246,6 +244,8 @@ module.exports = {
 
                     ], flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral] });
 
+                break;
+
             }
             
             case "create": {
@@ -425,7 +425,7 @@ module.exports = {
                         })
                     )
 
-                    await modalInteraction.editReply({
+                    return await modalInteraction.editReply({
                         embeds: [],
                         components: [
                             new ContainerBuilder()
@@ -606,7 +606,7 @@ module.exports = {
                         requestBody: { requests }
                     });
 
-                    await modalInteraction.reply({
+                    return await modalInteraction.reply({
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle("Worklog Entry Added")
@@ -632,9 +632,54 @@ module.exports = {
                 await interaction.reply("Worklog view command is under development.");  
                 break;
 
-            case "export":
-                await interaction.reply("Worklog export command is under development.");
+            case "export": {
+                await user.populate({
+                    path: "activeWorklog",
+                    populate: { path: "event" }
+                });
+                
+                const worklog = user.activeWorklog;
+
+                if(!worklog) return await interaction.reply({ embeds: [
+                    new EmbedBuilder()
+                        .setTitle("No Active Worklog")
+                        .setDescription("You have no active worklog. Please create one using `/worklog create` or switch to an existing one using `/worklog worklogs switch`.")
+                        .setColor("Red")
+                ], ephemeral: true });
+
+                const documentId = worklog.link.split("/d/")[1].split("/")[0];
+
+                await interaction.deferReply({ ephemeral: true });
+
+                const response = await googleClient.drive.files.export({
+                    fileId: documentId,
+                    mimeType: "application/pdf"
+                }, { responseType: "stream" }).catch(error => Errors.errorMessage({
+                    stack:  error.stack,
+                    content: error.message,
+                    title: "Error exporting worklog",
+                    interaction: interaction,
+                    followUp: true
+                }));
+
+                const fileName = `TSA ${worklog.event.name} Worklog.pdf`.replaceAll(" ", "_"),
+                      file     = new AttachmentBuilder(response.data, { name: fileName });
+
+                const container = new ContainerBuilder()
+                    .setAccentColor(0x90ee90)
+                    .addTextDisplayComponents(t => t.setContent(`## Worklog Export`))
+                    .addSeparatorComponents(s => s)
+                    .addTextDisplayComponents(t => t.setContent(`Here is the PDF export of your worklog for **${worklog.event.name}**.`))
+                    .addFileComponents(f => f.setURL(`attachment://${fileName}`));
+
+                return await interaction.editReply({
+                    components: [container],
+                    files: [file],
+                    flags: [MessageFlags.IsComponentsV2]
+                });
+                    
                 break;
+            }
         
         }
     }
