@@ -30,10 +30,6 @@ module.exports = {
         description: "View/Modify your user settings",
         type: ApplicationCommandOptionType.Subcommand
     }, {
-        name: "view",
-        description: "View your private profile, which displays infos such as your worklogs. Only you can see this message",
-        type: ApplicationCommandOptionType.Subcommand
-    }, {
         name: "profile",
         description: "Displays your public profile, which includes current/past events and significant placements",
         type: ApplicationCommandOptionType.Subcommand
@@ -175,7 +171,6 @@ module.exports = {
                         .then(async confirmationInteraction => {
                             if(confirmationInteraction.customId === "confirmProfileInit") {
 
-
                                 user.discordId = modalInteraction.user.id;
                                 user.verified = true;
 
@@ -199,13 +194,6 @@ module.exports = {
                                     components: []
                                 });
 
-                                //find all events with a worklog and with this user
-                                (await Event.find({worklog: {$exists: true}, members: { $in: [user._id] }})).forEach(worklog => {
-                                    if(!user.events) user.events = [];
-                                    user.events.push(worklog._id);
-                                })
-
-                                await user.save();
                                 if(!user.worklogs) return;
 
                                 return await confirmationInteraction.followUp({
@@ -265,18 +253,12 @@ module.exports = {
             case "settings":
                 return await interaction.reply("User settings command is under development.");
                 break;
-            case "view":
-                
-                return await interaction.reply({
-                    components: [
 
-                    ],
-                    ephemeral: true
-                });
-                break;
             case "profile":
+
                 return await interaction.reply("User profile command is under development.");
                 break;
+
             case "delete":
                 return await interaction.reply("User delete command is under development.");
                 break;

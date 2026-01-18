@@ -437,7 +437,6 @@ module.exports = {
                     }
 
                     await updateMessageContent("*Sharing document with teammates...*", true);
-                    
 
                     await Promise.all(
  
